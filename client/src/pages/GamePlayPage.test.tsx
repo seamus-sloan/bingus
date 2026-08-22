@@ -172,35 +172,8 @@ describe('gameplay screen', () => {
     ).toBe('')
   })
 
-  it('shows the BINGO overlay with the pattern badge when I win', async () => {
-    await renderGame(
-      makeRoom(
-        makeState({
-          status: 'finished',
-          winner: { playerId: 'p1', pattern: 'diagonal', line: [0, 4, 8] },
-        }),
-      ),
-    )
-    expect(screen.getByText('BINGO!')).toBeDefined()
-    expect(screen.getByText('DIAGONAL, BABY')).toBeDefined()
-    expect(screen.getByText(/Ruth wins/)).toBeDefined()
-  })
-
-  it('shows the loss card naming the winner when a rival wins', async () => {
-    await renderGame(
-      makeRoom(
-        makeState({
-          status: 'finished',
-          winner: { playerId: 'p2', pattern: 'row', line: [0, 1, 2] },
-        }),
-      ),
-    )
-    expect(screen.getByText('You Lose! 💀')).toBeDefined()
-    expect(
-      screen.getByText('Zoe hit a full row across on Office Chaos.'),
-    ).toBeDefined()
-  })
-
+  // Finished games render GameOverPage (see GameRoute), but the guard keeps
+  // a stray click harmless during the state flip.
   it('cells stop responding once the game is finished', async () => {
     const room = makeRoom(
       makeState({

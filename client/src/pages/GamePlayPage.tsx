@@ -1,19 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import {
-  freeIndex,
-  type BoardSize,
-  type GamePlayer,
-  type GameWinner,
-  type WinPattern,
-} from '@bingus/shared'
+import { freeIndex, type BoardSize, type GamePlayer } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
 import { useSession } from '../lib/session'
 import styles from './GamePlayPage.module.css'
 
 // Mockup 1g — the live table. My card in the main column, rivals' mini
-// boards + trash-talk chat in the right rail, and the win/lose overlay
-// (mockup 1i energy) once the server declares a winner.
+// boards + trash-talk chat in the right rail. Once the server declares a
+// winner, GameRoute swaps this screen for GameOverPage (mockups 1i/1h).
 
 // Candy accents for rivals + chat avatars, derived from the player id so a
 // player keeps their color across renders without storing anything.
@@ -28,28 +22,6 @@ function hashId(id: string): number {
 function accentFor(id: string): string {
   return CANDY[hashId(id) % CANDY.length]
 }
-
-const WIN_BADGE: Record<WinPattern, string> = {
-  row: 'ROW, BABY',
-  column: 'COLUMN, BABY',
-  diagonal: 'DIAGONAL, BABY',
-  blackout: 'TOTAL BLACKOUT',
-}
-
-const WIN_PHRASE: Record<WinPattern, string> = {
-  row: 'full row across',
-  column: 'column',
-  diagonal: 'diagonal',
-  blackout: 'full blackout',
-}
-
-// Static confetti layout — deterministic so render stays pure.
-const CONFETTI = Array.from({ length: 40 }, (_, i) => ({
-  left: (i * 83) % 100,
-  delay: ((i * 37) % 20) / 10,
-  duration: 2.6 + ((i * 53) % 14) / 10,
-  color: CANDY[i % CANDY.length],
-}))
 
 // A tiny celebratory pop on marking a tile. Pure garnish: any environment
 // without WebAudio (tests, muted autoplay policies) just stays silent.
@@ -172,65 +144,6 @@ function GamePlayPeek({
   )
 }
 
-function GamePlayOverlay({
-  winner,
-  winnerName,
-  boardName,
-  isMe,
-  myName,
-  onExit,
-}: {
-  winner: GameWinner
-  winnerName: string
-  boardName: string
-  isMe: boolean
-  myName: string
-  onExit: () => void
-}) {
-  if (!isMe) {
-    return (
-      <div className={styles.overlay}>
-        <div className={styles.loseCard}>
-          <h2 className={styles.loseTitle}>You Lose! 💀</h2>
-          <p className={styles.loseSub}>
-            {winnerName} hit a {WIN_PHRASE[winner.pattern]} on {boardName}.
-          </p>
-          <button className={styles.overlayCta} type="button" onClick={onExit}>
-            Return to the archive
-          </button>
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className={styles.overlay}>
-      {CONFETTI.map((c, i) => (
-        <span
-          key={i}
-          className={styles.confetti}
-          style={{
-            left: `${c.left}%`,
-            background: c.color,
-            animationDelay: `${c.delay}s`,
-            animationDuration: `${c.duration}s`,
-          }}
-          aria-hidden
-        />
-      ))}
-      <div className={styles.winCard}>
-        <span className={styles.winBadge}>{WIN_BADGE[winner.pattern]}</span>
-        <h2 className={styles.bingo}>BINGO!</h2>
-        <p className={styles.winSub}>
-          {myName} wins. Crowd goes wild. (Try to be humble about it.)
-        </p>
-        <button className={styles.overlayCta} type="button" onClick={onExit}>
-          Back to the archive
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function GamePlayPage({ room }: { room: GameRoomView }) {
   const navigate = useNavigate()
   const { player } = useSession()
@@ -257,10 +170,6 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
   const rivals = state.players.filter((p) => p.player.id !== player.id)
   const peeked = rivals.find((r) => r.player.id === peekId) ?? null
   const online = state.players.filter((p) => p.connected).length
-  const winnerName = winner
-    ? (state.players.find((p) => p.player.id === winner.playerId)?.player
-        .name ?? 'Someone')
-    : ''
 
   const handleCell = (cell: number) => {
     const isMarked = me.marks.includes(cell)
@@ -431,16 +340,6 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
           </div>
         </aside>
       </main>
-      {finished && winner && (
-        <GamePlayOverlay
-          winner={winner}
-          winnerName={winnerName}
-          boardName={state.board.name}
-          isMe={winner.playerId === player.id}
-          myName={player.name}
-          onExit={() => navigate('/boards')}
-        />
-      )}
     </>
   )
 }
