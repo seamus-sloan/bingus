@@ -7,6 +7,8 @@ import {
   type CreatePlayerResponse,
   type RenamePlayerRequest,
   type RenamePlayerResponse,
+  StatsResponseSchema,
+  type StatsResponse,
 } from '@bingus/shared'
 
 export class ApiError extends Error {
@@ -34,6 +36,10 @@ async function request<T>(
     throw new Error(`Request failed (${res.status})`)
   }
   return parse(data)
+}
+
+export function getStats(): Promise<StatsResponse> {
+  return request('/api/stats', {}, (data) => StatsResponseSchema.parse(data))
 }
 
 export function createPlayer(name: string): Promise<CreatePlayerResponse> {

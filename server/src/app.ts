@@ -5,6 +5,7 @@ import {
   type ApiError,
   type CreatePlayerResponse,
   type RenamePlayerResponse,
+  type StatsResponse,
 } from "@bingus/shared";
 import type { PlayersRepo } from "./db.ts";
 
@@ -15,6 +16,15 @@ export function createApp(players: PlayersRepo) {
 
   app.get("/api/health", (c) =>
     c.json({ ok: true, service: "bingus-server" }),
+  );
+
+  app.get("/api/stats", (c) =>
+    c.json({
+      players: players.count(),
+      // Boards and live games land with their screens (board archive, lobby).
+      boards: 0,
+      liveGames: 0,
+    } satisfies StatsResponse),
   );
 
   app.post("/api/players", async (c) => {

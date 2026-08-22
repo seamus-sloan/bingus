@@ -17,6 +17,17 @@ export const PlayerSchema = z.object({
 });
 export type Player = z.infer<typeof PlayerSchema>;
 
+// --- REST: stats ---------------------------------------------------------
+// GET /api/stats — the Home screen's live numbers. `boards` and `liveGames`
+// stay 0 until the board archive and game tables exist.
+
+export const StatsResponseSchema = z.object({
+  players: z.number().int().nonnegative(),
+  boards: z.number().int().nonnegative(),
+  liveGames: z.number().int().nonnegative(),
+});
+export type StatsResponse = z.infer<typeof StatsResponseSchema>;
+
 // --- REST: players -------------------------------------------------------
 // POST /api/players — sign in by claiming a unique name.
 // PATCH /api/players/:id — rename (requires `Authorization: Bearer <token>`).

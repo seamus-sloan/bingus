@@ -45,6 +45,13 @@ export class PlayersRepo {
     return { player, token };
   }
 
+  count(): number {
+    const row = this.db.prepare("SELECT COUNT(*) AS n FROM players").get() as {
+      n: number;
+    };
+    return row.n;
+  }
+
   get(id: string): { player: Player; token: string } | undefined {
     const row = this.db
       .prepare("SELECT id, name, token FROM players WHERE id = ?")

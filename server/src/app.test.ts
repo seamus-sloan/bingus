@@ -49,6 +49,16 @@ describe("GET /api/health", () => {
   });
 });
 
+describe("GET /api/stats", () => {
+  it("counts signed-up players", async () => {
+    await signIn("Ruth");
+    await signIn("Priya");
+    const res = await app.request("/api/stats");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ players: 2, boards: 0, liveGames: 0 });
+  });
+});
+
 describe("POST /api/players", () => {
   it("creates a player and returns a token", async () => {
     const { status, body } = await signIn("Ruth");

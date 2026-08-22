@@ -1,5 +1,8 @@
 .main {
   padding: 56px 72px;
+  max-width: 1136px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .title {
@@ -15,5 +18,151 @@
   font-size: 19px;
   font-weight: 600;
   color: var(--muted);
-  margin: 12px 0 0;
+  margin: 12px 0 40px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 900px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.newCard,
+.joinCard {
+  position: relative;
+  border: 3px solid var(--ink);
+  border-radius: 26px;
+  box-shadow: 8px 8px 0 var(--ink);
+  padding: 38px 38px 34px;
+  overflow: hidden;
+}
+
+.newCard {
+  background: var(--grad);
+  color: #fff;
+}
+
+.joinCard {
+  background: #fff;
+}
+
+.star {
+  position: absolute;
+  right: -30px;
+  top: -34px;
+  font-size: 150px;
+  opacity: 0.25;
+  transform: rotate(14deg);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 38px;
+  letter-spacing: -1px;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.newCopy,
+.joinCopy {
+  font-size: 15.5px;
+  font-weight: 600;
+  margin: 14px 0 26px;
+  max-width: 34ch;
+}
+
+.newCopy {
+  opacity: 0.95;
+}
+
+.joinCopy {
+  color: var(--muted);
+}
+
+.newCta,
+.joinCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 24px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 15px;
+  border: 2.5px solid var(--ink);
+  cursor: pointer;
+}
+
+.newCta {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.joinCta {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 4px 4px 0 rgba(43, 27, 51, 0.35);
+}
+
+.newCta:active,
+.joinCta:active {
+  translate: 2px 2px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.liveBadge {
+  position: absolute;
+  right: 26px;
+  top: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  background: var(--lime);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.pulseDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: dpulse 1.6s ease-in-out infinite;
+}
+
+.stats {
+  margin-top: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--faint);
+}
+
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-1deg);
+  padding: 12px 22px;
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 5px 5px 0 var(--ink);
+  font-weight: 800;
+  font-size: 14px;
+  z-index: 40;
 }

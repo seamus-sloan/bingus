@@ -1,6 +1,6 @@
 # Architecture
 
-Bingus is an npm-workspaces monorepo with three packages:
+Bingus is a pnpm-workspaces monorepo with three packages:
 
 ```
 client/   @bingus/client — Vite + React 19 + TypeScript SPA
@@ -19,6 +19,7 @@ Everything that is not live game traffic goes over plain HTTP under `/api/*`, se
 Current endpoints:
 
 - `GET /api/health` — liveness probe.
+- `GET /api/stats` — Home-screen numbers (player count is live; boards/liveGames stay 0 until those features exist).
 - `POST /api/players` — sign in by claiming a unique name (case-insensitive). Returns the `Player` plus a `token`; `409 name_taken` on collision.
 - `PATCH /api/players/:id` — rename. Requires `Authorization: Bearer <token>` from the create response; same `409 name_taken` on collision.
 
@@ -56,10 +57,11 @@ Active game state lives in memory on the single server process. Persistence live
 
 ## Dev workflow
 
-- `npm run dev` (root) runs both watchers via concurrently: `tsx watch` for the server (port 3000), Vite for the client (port 5173).
-- The server runs TypeScript directly via **tsx** — its `build` script is a typecheck (`tsc --noEmit`), and prod runs `npm run start -w server`. If a bundled artifact becomes worthwhile, revisit then.
+- The package manager is **pnpm** (`packageManager` field pins the version; workspace layout in [pnpm-workspace.yaml](../pnpm-workspace.yaml), `@bingus/shared` linked via `workspace:*`). pnpm blocks dependency build scripts by default — approvals live under `allowBuilds` in pnpm-workspace.yaml.
+- `pnpm run dev` (root) runs both watchers via `pnpm -r --parallel`: `tsx watch` for the server (port 3000), Vite for the client (port 5173).
+- The server runs TypeScript directly via **tsx** — its `build` script is a typecheck (`tsc --noEmit`), and prod runs `pnpm --filter @bingus/server start`. If a bundled artifact becomes worthwhile, revisit then.
 - Lint is **oxlint**, configured once at the repo root ([.oxlintrc.json](../.oxlintrc.json)).
-- Tests are **vitest** per workspace (`npm test` at the root fans out): jsdom environment in the client, Node in server/shared.
+- Tests are **vitest** per workspace (`pnpm test` at the root fans out): jsdom environment in the client, Node in server/shared.
 
 ## CI
 
