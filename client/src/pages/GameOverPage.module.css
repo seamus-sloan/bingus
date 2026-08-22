@@ -1,0 +1,461 @@
+/* --- shared bits -------------------------------------------------------- */
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* Local keyframes — CSS modules localize animation-name, so the global
+   index.css keyframes are out of reach on purpose. */
+@keyframes fall {
+  0% {
+    transform: translateY(-40px) rotate(0deg);
+  }
+  100% {
+    transform: translateY(110vh) rotate(660deg);
+  }
+}
+
+@keyframes cardFall {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+  }
+  100% {
+    transform: translateY(480px) rotate(540deg);
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-16px) rotate(var(--r, 0deg));
+  }
+}
+
+/* --- win screen (mockup 1i) ---------------------------------------------- */
+
+.winScreen {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  box-sizing: border-box;
+  background: var(--cream);
+}
+
+.float {
+  position: absolute;
+  border: 2.5px solid var(--ink);
+  animation: floaty var(--dur) ease-in-out var(--delay) infinite;
+  pointer-events: none;
+}
+
+.confetti {
+  position: absolute;
+  top: -40px;
+  width: 10px;
+  height: 22px;
+  border-radius: 3px;
+  animation: fall 3s linear infinite;
+  pointer-events: none;
+}
+
+.winColumn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.winBadge {
+  padding: 8px 22px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  transform: rotate(-2deg);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.bingo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(72px, 15vw, 150px);
+  letter-spacing: -6px;
+  line-height: 1;
+  margin: 0;
+  background: linear-gradient(135deg, #ff8a00 10%, #ff3d8f 60%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(5px 5px 0 var(--ink));
+}
+
+.winSub {
+  font-size: 21px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.winSubFaint {
+  color: var(--faint);
+}
+
+.winCard {
+  display: grid;
+  gap: 6px;
+  width: 340px;
+  max-width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  box-shadow: 7px 7px 0 var(--ink);
+  transform: rotate(1deg);
+  box-sizing: border-box;
+}
+
+.winTile {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: var(--cream);
+}
+
+.winTileMarked {
+  background: var(--grad);
+}
+
+.winTileFree {
+  background: var(--yellow);
+}
+
+.tileRing {
+  box-shadow: 0 0 0 2.5px var(--yellow);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.ctaPrimary {
+  padding: 14px 30px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.ctaPrimary:active {
+  translate: 2px 2px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.ctaPrimary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ctaGhost {
+  padding: 14px 30px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.ctaGhost:active {
+  translate: 2px 2px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.error {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--magenta);
+  margin: 8px 0 0;
+}
+
+/* --- lose screen (mockup 1h) ---------------------------------------------- */
+
+.loseScreen {
+  min-height: 100vh;
+  padding: 36px;
+  box-sizing: border-box;
+  background: var(--cream);
+}
+
+.loseInner {
+  max-width: 1020px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--faint);
+  margin: 0 0 28px;
+}
+
+.loseGrid {
+  display: grid;
+  grid-template-columns: 480px 1fr;
+  gap: 36px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .loseGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.winnerWrap {
+  position: relative;
+  padding-top: 16px;
+}
+
+.ribbon {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  z-index: 2;
+  padding: 8px 18px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.winnerCard {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 16px 16px;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 7px 7px 0 var(--magenta);
+  box-sizing: border-box;
+}
+
+.miniConfetti {
+  position: absolute;
+  top: -18px;
+  width: 7px;
+  height: 15px;
+  border-radius: 2px;
+  animation: cardFall 2.6s linear infinite;
+  pointer-events: none;
+}
+
+.winnerGrid {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+.winnerCell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2px;
+  border: 1.5px solid var(--ink);
+  border-radius: 7px;
+  background: var(--paper);
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.winnerCellFree {
+  background: var(--yellow);
+  font-weight: 800;
+}
+
+.winnerCellLine {
+  background: var(--grad);
+  color: #fff;
+  box-shadow: 0 0 0 2.5px var(--yellow);
+}
+
+.winnerLine {
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  margin: 14px 0 0;
+}
+
+.restLabel {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--faint);
+  margin: 0 0 12px;
+}
+
+.restGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 14px;
+}
+
+.restPlayer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.restBoard {
+  display: grid;
+  gap: 2.5px;
+  padding: 6px;
+  width: 100%;
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: 13px;
+  box-sizing: border-box;
+}
+
+.restCell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+}
+
+.restName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  max-width: 100%;
+}
+
+.restName .avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+
+.loseCard {
+  margin-top: 26px;
+  padding: 30px 34px;
+  background: var(--ink);
+  border-radius: 24px;
+  box-shadow: 8px 8px 0 rgba(43, 27, 51, 0.3);
+  transform: rotate(-0.6deg);
+  color: #fff;
+  text-align: center;
+}
+
+.loseTitle {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 52px;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin: 0 0 12px;
+  color: #ff9ec7;
+}
+
+.loseSub {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--cream);
+  margin: 0 0 20px;
+}
+
+.loseActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ctaPrimaryDark {
+  padding: 13px 26px;
+  border: 2.5px solid #fff;
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ctaPrimaryDark:active {
+  translate: 1px 1px;
+}
+
+.ctaPrimaryDark:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ctaGhostDark {
+  padding: 13px 26px;
+  border: 2.5px solid #fff;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ctaGhostDark:active {
+  translate: 1px 1px;
+}
+
+.errorDark {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--yellow);
+  margin: 14px 0 0;
+}

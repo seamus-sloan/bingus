@@ -1,12 +1,13 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppHeader } from '../components/AppHeader'
 import { useGameRoom } from '../lib/gameRoom'
+import { GameOverPage } from './GameOverPage'
 import { GamePlayPage } from './GamePlayPage'
 import { LobbyPage } from './LobbyPage'
 
 // /game/:code — joins the table over the socket and hands the live room to
-// the right screen: lobby before the host starts, gameplay after (the
-// gameplay screen also owns the finished/win/lose presentation).
+// the right screen: lobby before the host starts, gameplay while playing,
+// and the full-art win/lose screen once the server declares a winner.
 export function GameRoute() {
   const { code = '' } = useParams()
   // Remounting on code change resets useGameRoom's state wholesale.
@@ -44,9 +45,9 @@ function GameRoomScreens({ code }: { code: string }) {
     )
   }
 
-  return status.room.state.status === 'lobby' ? (
-    <LobbyPage room={status.room} />
-  ) : (
-    <GamePlayPage room={status.room} />
-  )
+  if (status.room.state.status === 'lobby') return <LobbyPage room={status.room} />
+  if (status.room.state.status === 'finished') {
+    return <GameOverPage room={status.room} />
+  }
+  return <GamePlayPage room={status.room} />
 }
