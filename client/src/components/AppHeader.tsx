@@ -5,14 +5,14 @@ import { useSession } from '../lib/session'
 import styles from './AppHeader.module.css'
 
 export function AppHeader() {
-  const { session, rename } = useSession()
+  const { player, rename } = useSession()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
-  if (!session) return null
-  const { name } = session.player
+  if (!player) return null
+  const { name } = player
 
   function toggle() {
     setOpen((was) => !was)

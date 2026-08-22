@@ -28,27 +28,29 @@ export const StatsResponseSchema = z.object({
 });
 export type StatsResponse = z.infer<typeof StatsResponseSchema>;
 
-// --- REST: players -------------------------------------------------------
-// POST /api/players — sign in by claiming a unique name.
-// PATCH /api/players/:id — rename (requires `Authorization: Bearer <token>`).
+// --- REST: players & session ---------------------------------------------
+// Identity rides in an httpOnly session cookie set by the server; the client
+// never sees or stores the token.
+//
+// POST /api/players — sign in by claiming a unique name. Sets the cookie.
+// GET  /api/me — resolve the cookie to a player. 401 when the cookie is
+//   missing or the player no longer exists (a stale "ghost" session).
+// PATCH /api/me — rename the signed-in player.
 
 export const CreatePlayerRequestSchema = z.object({ name: PlayerNameSchema });
 export type CreatePlayerRequest = z.infer<typeof CreatePlayerRequestSchema>;
 
-export const CreatePlayerResponseSchema = z.object({
-  player: PlayerSchema,
-  token: z.string(),
-});
+export const CreatePlayerResponseSchema = z.object({ player: PlayerSchema });
 export type CreatePlayerResponse = z.infer<typeof CreatePlayerResponseSchema>;
+
+export const MeResponseSchema = z.object({ player: PlayerSchema });
+export type MeResponse = z.infer<typeof MeResponseSchema>;
 
 export const RenamePlayerRequestSchema = z.object({ name: PlayerNameSchema });
 export type RenamePlayerRequest = z.infer<typeof RenamePlayerRequestSchema>;
 
-export const RenamePlayerResponseSchema = z.object({ player: PlayerSchema });
-export type RenamePlayerResponse = z.infer<typeof RenamePlayerResponseSchema>;
-
 export const ApiErrorSchema = z.object({
-  code: z.enum(["invalid_name", "name_taken", "not_found", "unauthorized"]),
+  code: z.enum(["invalid_name", "name_taken", "unauthorized"]),
   error: z.string(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

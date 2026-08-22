@@ -1,18 +1,30 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import {
   CreatePlayerRequestSchema,
   RenamePlayerRequestSchema,
   type ApiError,
   type CreatePlayerResponse,
-  type RenamePlayerResponse,
+  type MeResponse,
   type StatsResponse,
 } from "@bingus/shared";
 import type { PlayersRepo } from "./db.ts";
+
+// The session cookie holds the player's token. httpOnly keeps it out of
+// reach of client-side JS; the browser sends it on every same-origin request
+// (including the Socket.IO handshake, which realtime auth will lean on).
+export const SESSION_COOKIE = "bingus_session";
+const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // a year of trash talk
 
 // HTTP surface: REST endpoints live here (players, board archive, health).
 // Realtime traffic goes through Socket.IO — see socket.ts.
 export function createApp(players: PlayersRepo) {
   const app = new Hono();
+
+  const currentPlayer = (c: Context) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    return token ? players.getByToken(token) : undefined;
+  };
 
   app.get("/api/health", (c) =>
     c.json({ ok: true, service: "bingus-server" }),
@@ -36,34 +48,33 @@ export function createApp(players: PlayersRepo) {
     }
     const result = players.create(body.data.name);
     if (result === "name_taken") return c.json(nameTaken(body.data.name), 409);
-    return c.json(result satisfies CreatePlayerResponse, 201);
+    setCookie(c, SESSION_COOKIE, result.token, {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: SESSION_MAX_AGE,
+    });
+    return c.json({ player: result.player } satisfies CreatePlayerResponse, 201);
   });
 
-  app.patch("/api/players/:id", async (c) => {
-    const id = c.req.param("id");
-    const existing = players.get(id);
-    if (!existing) {
-      return c.json(
-        { code: "not_found", error: "No such player." } satisfies ApiError,
-        404,
-      );
-    }
-    const token = c.req.header("Authorization")?.replace(/^Bearer /, "");
-    if (token !== existing.token) {
-      return c.json(
-        { code: "unauthorized", error: "That's not your name to change." } satisfies ApiError,
-        401,
-      );
-    }
+  app.get("/api/me", (c) => {
+    const me = currentPlayer(c);
+    if (!me) return c.json(unauthorized(), 401);
+    return c.json({ player: me.player } satisfies MeResponse);
+  });
+
+  app.patch("/api/me", async (c) => {
+    const me = currentPlayer(c);
+    if (!me) return c.json(unauthorized(), 401);
     const body = RenamePlayerRequestSchema.safeParse(
       await c.req.json().catch(() => null),
     );
     if (!body.success) {
       return c.json(invalidName(body.error.issues[0]?.message), 400);
     }
-    const result = players.rename(id, body.data.name);
+    const result = players.rename(me.player.id, body.data.name);
     if (result === "name_taken") return c.json(nameTaken(body.data.name), 409);
-    return c.json({ player: result } satisfies RenamePlayerResponse);
+    return c.json({ player: result } satisfies MeResponse);
   });
 
   return app;
@@ -78,4 +89,8 @@ function nameTaken(name: string): ApiError {
     code: "name_taken",
     error: `"${name}" is taken. Choose more wisely.`,
   };
+}
+
+function unauthorized(): ApiError {
+  return { code: "unauthorized", error: "No seat at the table. Sign in." };
 }

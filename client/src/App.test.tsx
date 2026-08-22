@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Player } from '@bingus/shared'
 import App from './App'
 
 function jsonResponse(status: number, body: unknown) {
@@ -10,55 +11,101 @@ function jsonResponse(status: number, body: unknown) {
   }
 }
 
-beforeEach(() => {
-  localStorage.clear()
-})
+const unauthorized = { code: 'unauthorized', error: 'No seat at the table.' }
+
+// Route the fetch mock the way the server would respond. `me` is the player
+// the session cookie resolves to (null = signed out / ghost session).
+function mockApi({
+  me = null,
+  stats = { players: 5, boards: 0, liveGames: 0 },
+  createStatus = 201,
+  createBody = null,
+  renamed = null,
+}: {
+  me?: Player | null
+  stats?: { players: number; boards: number; liveGames: number }
+  createStatus?: number
+  createBody?: unknown
+  renamed?: Player | null
+} = {}) {
+  const fetchMock = vi.fn().mockImplementation(
+    (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (url === '/api/me' && method === 'GET') {
+        return Promise.resolve(
+          me ? jsonResponse(200, { player: me }) : jsonResponse(401, unauthorized),
+        )
+      }
+      if (url === '/api/me' && method === 'PATCH') {
+        return Promise.resolve(jsonResponse(200, { player: renamed }))
+      }
+      if (url === '/api/players' && method === 'POST') {
+        return Promise.resolve(jsonResponse(createStatus, createBody))
+      }
+      if (url === '/api/stats') {
+        return Promise.resolve(jsonResponse(200, stats))
+      }
+      return Promise.resolve(jsonResponse(404, { code: 'unauthorized', error: 'nope' }))
+    },
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
 })
 
-describe('sign-in flow', () => {
-  it('shows the sign-in screen when no session exists', () => {
+describe('session gate', () => {
+  it('shows the sign-in screen when /api/me says there is no session', async () => {
+    mockApi({ me: null })
     render(<App />)
-    expect(screen.getByRole('heading', { name: 'Bingus' })).toBeDefined()
-    expect(screen.getByLabelText('YOUR NAME')).toBeDefined()
+    expect(await screen.findByLabelText('YOUR NAME')).toBeDefined()
   })
 
-  it('signs in and lands on home with the profile chip', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(201, {
-          player: { id: 'p1', name: 'Ruth' },
-          token: 'tok',
-        }),
-      ),
-    )
+  it('restores a valid session straight to home', async () => {
+    mockApi({ me: { id: 'p1', name: 'Ruth' } })
     render(<App />)
-    fireEvent.change(screen.getByLabelText('YOUR NAME'), {
+    expect(await screen.findByRole('button', { name: /Ruth/ })).toBeDefined()
+    expect(screen.queryByLabelText('YOUR NAME')).toBeNull()
+  })
+
+  it('kicks a ghost session back to sign-in', async () => {
+    // The cookie may exist in the browser, but the server no longer knows the
+    // player — /api/me 401s and the only screen offered is sign-in.
+    mockApi({ me: null })
+    render(<App />)
+    expect(await screen.findByLabelText('YOUR NAME')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Let's go/ })).toBeNull()
+  })
+})
+
+describe('sign-in flow', () => {
+  it('signs in and lands on home with the profile chip', async () => {
+    mockApi({
+      me: null,
+      createBody: { player: { id: 'p1', name: 'Ruth' } },
+    })
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('YOUR NAME'), {
       target: { value: 'Ruth' },
     })
     fireEvent.click(screen.getByRole('button', { name: /Let's play/ }))
     expect(await screen.findByRole('button', { name: /Ruth/ })).toBeDefined()
-    expect(
-      JSON.parse(localStorage.getItem('bingus.session') ?? 'null'),
-    ).toEqual({ player: { id: 'p1', name: 'Ruth' }, token: 'tok' })
   })
 
   it('surfaces a name-taken error from the server', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(409, {
-          code: 'name_taken',
-          error: '"Ruth" is taken. Choose more wisely.',
-        }),
-      ),
-    )
+    mockApi({
+      me: null,
+      createStatus: 409,
+      createBody: {
+        code: 'name_taken',
+        error: '"Ruth" is taken. Choose more wisely.',
+      },
+    })
     render(<App />)
-    fireEvent.change(screen.getByLabelText('YOUR NAME'), {
+    fireEvent.change(await screen.findByLabelText('YOUR NAME'), {
       target: { value: 'Ruth' },
     })
     fireEvent.click(screen.getByRole('button', { name: /Let's play/ }))
@@ -67,28 +114,14 @@ describe('sign-in flow', () => {
 })
 
 describe('home screen', () => {
-  function signInAndMockStats(liveGames: number) {
-    localStorage.setItem(
-      'bingus.session',
-      JSON.stringify({ player: { id: 'p1', name: 'Ruth' }, token: 'tok' }),
-    )
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((url: string) =>
-        Promise.resolve(
-          url === '/api/stats'
-            ? jsonResponse(200, { players: 5, boards: 0, liveGames })
-            : jsonResponse(404, { code: 'not_found', error: 'nope' }),
-        ),
-      ),
-    )
-  }
-
   it('shows both game cards and the stats strip', async () => {
-    signInAndMockStats(0)
+    mockApi({
+      me: { id: 'p1', name: 'Ruth' },
+      stats: { players: 5, boards: 0, liveGames: 0 },
+    })
     render(<App />)
     expect(
-      screen.getByRole('heading', { name: /Start a\s*new game/ }),
+      await screen.findByRole('heading', { name: /Start a\s*new game/ }),
     ).toBeDefined()
     expect(screen.getByRole('heading', { name: /Join a\s*game/ })).toBeDefined()
     expect(await screen.findByText(/5 players signed up/)).toBeDefined()
@@ -97,16 +130,19 @@ describe('home screen', () => {
   })
 
   it('shows the live badge when tables are live', async () => {
-    signInAndMockStats(3)
+    mockApi({
+      me: { id: 'p1', name: 'Ruth' },
+      stats: { players: 5, boards: 0, liveGames: 3 },
+    })
     render(<App />)
     expect(await screen.findByText('3 LIVE')).toBeDefined()
     expect(screen.getByText(/3 tables are playing right now/)).toBeDefined()
   })
 
   it('raises a coming-soon toast from the CTAs', async () => {
-    signInAndMockStats(0)
+    mockApi({ me: { id: 'p1', name: 'Ruth' } })
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: /Let's go/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Let's go/ }))
     expect((await screen.findByRole('status')).textContent).toContain(
       'still at the printers',
     )
@@ -115,16 +151,12 @@ describe('home screen', () => {
 
 describe('profile rename', () => {
   it('renames via the header profile chip', async () => {
-    localStorage.setItem(
-      'bingus.session',
-      JSON.stringify({ player: { id: 'p1', name: 'Ruth' }, token: 'tok' }),
-    )
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse(200, { player: { id: 'p1', name: 'TileSlayer' } }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = mockApi({
+      me: { id: 'p1', name: 'Ruth' },
+      renamed: { id: 'p1', name: 'TileSlayer' },
+    })
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: /Ruth/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Ruth/ }))
     fireEvent.change(screen.getByLabelText('CHANGE YOUR NAME'), {
       target: { value: 'TileSlayer' },
     })
@@ -133,11 +165,8 @@ describe('profile rename', () => {
       await screen.findByRole('button', { name: /TileSlayer/ }),
     ).toBeDefined()
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/players/p1',
-      expect.objectContaining({
-        method: 'PATCH',
-        headers: expect.objectContaining({ Authorization: 'Bearer tok' }),
-      }),
+      '/api/me',
+      expect.objectContaining({ method: 'PATCH' }),
     )
   })
 })

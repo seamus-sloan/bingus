@@ -20,8 +20,9 @@ Current endpoints:
 
 - `GET /api/health` — liveness probe.
 - `GET /api/stats` — Home-screen numbers (player count is live; boards/liveGames stay 0 until those features exist).
-- `POST /api/players` — sign in by claiming a unique name (case-insensitive). Returns the `Player` plus a `token`; `409 name_taken` on collision.
-- `PATCH /api/players/:id` — rename. Requires `Authorization: Bearer <token>` from the create response; same `409 name_taken` on collision.
+- `POST /api/players` — sign in by claiming a unique name (case-insensitive). Sets the httpOnly session cookie and returns the `Player`; `409 name_taken` on collision.
+- `GET /api/me` — resolve the session cookie to a player. `401 unauthorized` when the cookie is missing or the player no longer exists (ghost session).
+- `PATCH /api/me` — rename the signed-in player; same `409 name_taken` on collision.
 
 - In **dev**, the client calls same-origin paths (`fetch('/api/...')`) and the Vite dev server proxies them to `http://localhost:3000` (see [client/vite.config.ts](../client/vite.config.ts)). No CORS anywhere.
 - In **prod**, the client build is static and is expected to be served from the same origin as the server, so the same same-origin calls work unchanged.
@@ -52,8 +53,9 @@ Active game state lives in memory on the single server process. Persistence live
 ## Persistence & identity
 
 - **SQLite via `node:sqlite`** (Node's built-in driver — still flagged experimental upstream, but the surface we use is tiny and isolated in [server/src/db.ts](../server/src/db.ts); swap the driver there if it ever shifts). The database file defaults to `server/data/bingus.db` (gitignored) and is overridable with `BINGUS_DB`; tests use `:memory:`.
-- **Players** are the identity model: no accounts, just a globally unique name (enforced `UNIQUE COLLATE NOCASE` in the DB — uniqueness lives in the schema, not application code). Creating a player returns a bearer `token` that authorizes profile changes.
-- **The client session** (`player` + `token`) is kept in localStorage by [client/src/lib/session.tsx](../client/src/lib/session.tsx). No session = sign-in screen; the header's profile chip edits the name via the PATCH endpoint.
+- **Players** are the identity model: no accounts, just a globally unique name (enforced `UNIQUE COLLATE NOCASE` in the DB — uniqueness lives in the schema, not application code).
+- **Sessions are an httpOnly cookie** (`bingus_session`, a year-long token unique per player). The server sets it on sign-up and resolves it on every request; client JS never sees the token. The same cookie rides the Socket.IO handshake, which realtime auth will use.
+- **The client validates the session on every load** via `GET /api/me` ([client/src/lib/session.tsx](../client/src/lib/session.tsx)). A 401 — no cookie, or a ghost session whose player was deleted — lands on the sign-in screen; nothing but sign-in renders without a server-confirmed player. When a router is introduced, this gate becomes the guard around every authenticated route.
 
 ## Dev workflow
 

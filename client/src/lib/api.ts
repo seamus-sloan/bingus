@@ -1,12 +1,12 @@
 import {
   ApiErrorSchema,
   CreatePlayerResponseSchema,
-  RenamePlayerResponseSchema,
+  MeResponseSchema,
   type ApiErrorCode,
   type CreatePlayerRequest,
   type CreatePlayerResponse,
+  type MeResponse,
   type RenamePlayerRequest,
-  type RenamePlayerResponse,
   StatsResponseSchema,
   type StatsResponse,
 } from '@bingus/shared'
@@ -42,6 +42,8 @@ export function getStats(): Promise<StatsResponse> {
   return request('/api/stats', {}, (data) => StatsResponseSchema.parse(data))
 }
 
+// Sign in. The server responds with the player and sets the httpOnly session
+// cookie — the token never reaches client code.
 export function createPlayer(name: string): Promise<CreatePlayerResponse> {
   return request(
     '/api/players',
@@ -53,18 +55,24 @@ export function createPlayer(name: string): Promise<CreatePlayerResponse> {
   )
 }
 
-export function renamePlayer(
-  id: string,
-  token: string,
-  name: string,
-): Promise<RenamePlayerResponse> {
+// Resolve the session cookie to a player; null means no valid session
+// (no cookie, or a ghost session whose player no longer exists).
+export async function getMe(): Promise<MeResponse | null> {
+  try {
+    return await request('/api/me', {}, (data) => MeResponseSchema.parse(data))
+  } catch (err) {
+    if (err instanceof ApiError && err.code === 'unauthorized') return null
+    throw err
+  }
+}
+
+export function renameMe(name: string): Promise<MeResponse> {
   return request(
-    `/api/players/${id}`,
+    '/api/me',
     {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name } satisfies RenamePlayerRequest),
     },
-    (data) => RenamePlayerResponseSchema.parse(data),
+    (data) => MeResponseSchema.parse(data),
   )
 }

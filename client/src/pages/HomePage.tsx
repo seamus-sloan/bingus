@@ -9,7 +9,7 @@ import styles from './HomePage.module.css'
 // picker (1c) and live tables (1e); until those screens exist they raise a
 // "coming soon" toast.
 export function HomePage() {
-  const { session } = useSession()
+  const { player } = useSession()
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -36,7 +36,7 @@ export function HomePage() {
     <>
       <AppHeader />
       <main className={styles.main}>
-        <h2 className={styles.title}>Game on, {session?.player.name}.</h2>
+        <h2 className={styles.title}>Game on, {player?.name}.</h2>
         <p className={styles.subtitle}>Pick your poison.</p>
         <div className={styles.cards}>
           <section className={styles.newCard}>

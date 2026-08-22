@@ -2,33 +2,26 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from 'react'
 import type { Player } from '@bingus/shared'
-import { createPlayer, renamePlayer } from './api'
+import { createPlayer, getMe, renameMe } from './api'
 
-// The signed-in identity, persisted in localStorage. The token authorizes
-// profile changes (sent as a Bearer header) and never leaves this module
-// except inside API calls.
-export interface Session {
-  player: Player
-  token: string
-}
+// Identity rides in an httpOnly session cookie owned by the server. On load
+// we ask /api/me who we are — if the cookie is missing or points at a player
+// that no longer exists (a ghost session), the server 401s and we land on
+// the sign-in screen. Client code never sees the token.
 
-const STORAGE_KEY = 'bingus.session'
-
-function loadSession(): Session | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Session) : null
-  } catch {
-    return null
-  }
-}
+type SessionState =
+  | { status: 'loading'; player: null }
+  | { status: 'signed-out'; player: null }
+  | { status: 'signed-in'; player: Player }
 
 interface SessionContextValue {
-  session: Session | null
+  status: SessionState['status']
+  player: Player | null
   signIn: (name: string) => Promise<void>
   rename: (name: string) => Promise<void>
 }
@@ -36,32 +29,46 @@ interface SessionContextValue {
 const SessionContext = createContext<SessionContextValue | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(loadSession)
+  const [state, setState] = useState<SessionState>({
+    status: 'loading',
+    player: null,
+  })
 
-  const store = useCallback((next: Session) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    setSession(next)
+  useEffect(() => {
+    // Pre-cookie builds kept the session in localStorage — clear the leftover.
+    localStorage.removeItem('bingus.session')
+    let cancelled = false
+    getMe()
+      .then((res) => {
+        if (cancelled) return
+        setState(
+          res
+            ? { status: 'signed-in', player: res.player }
+            : { status: 'signed-out', player: null },
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'signed-out', player: null })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const signIn = useCallback(
-    async (name: string) => {
-      const { player, token } = await createPlayer(name)
-      store({ player, token })
-    },
-    [store],
-  )
+  const signIn = useCallback(async (name: string) => {
+    const { player } = await createPlayer(name)
+    setState({ status: 'signed-in', player })
+  }, [])
 
-  const rename = useCallback(
-    async (name: string) => {
-      if (!session) throw new Error('Not signed in')
-      const { player } = await renamePlayer(session.player.id, session.token, name)
-      store({ player, token: session.token })
-    },
-    [session, store],
-  )
+  const rename = useCallback(async (name: string) => {
+    const { player } = await renameMe(name)
+    setState({ status: 'signed-in', player })
+  }, [])
 
   return (
-    <SessionContext.Provider value={{ session, signIn, rename }}>
+    <SessionContext.Provider
+      value={{ status: state.status, player: state.player, signIn, rename }}
+    >
       {children}
     </SessionContext.Provider>
   )

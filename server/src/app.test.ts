@@ -3,9 +3,9 @@ import type { Hono } from "hono";
 import type {
   ApiError,
   CreatePlayerResponse,
-  RenamePlayerResponse,
+  MeResponse,
 } from "@bingus/shared";
-import { createApp } from "./app.ts";
+import { createApp, SESSION_COOKIE } from "./app.ts";
 import { openDb, PlayersRepo } from "./db.ts";
 
 let app: Hono;
@@ -23,22 +23,28 @@ async function signIn(name: string) {
     method: "POST",
     body: JSON.stringify({ name }),
   });
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  const cookie = setCookie.split(";")[0] ?? "";
   return {
     status: res.status,
+    setCookie,
+    cookie,
     body: (await res.json()) as Body<CreatePlayerResponse>,
   };
 }
 
-async function rename(id: string, token: string, name: string) {
-  const res = await app.request(`/api/players/${id}`, {
+async function me(cookie: string) {
+  const res = await app.request("/api/me", { headers: { Cookie: cookie } });
+  return { status: res.status, body: (await res.json()) as Body<MeResponse> };
+}
+
+async function rename(cookie: string, name: string) {
+  const res = await app.request("/api/me", {
     method: "PATCH",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: cookie },
     body: JSON.stringify({ name }),
   });
-  return {
-    status: res.status,
-    body: (await res.json()) as Body<RenamePlayerResponse>,
-  };
+  return { status: res.status, body: (await res.json()) as Body<MeResponse> };
 }
 
 describe("GET /api/health", () => {
@@ -60,12 +66,14 @@ describe("GET /api/stats", () => {
 });
 
 describe("POST /api/players", () => {
-  it("creates a player and returns a token", async () => {
-    const { status, body } = await signIn("Ruth");
+  it("creates a player and sets an httpOnly session cookie", async () => {
+    const { status, body, setCookie } = await signIn("Ruth");
     expect(status).toBe(201);
     expect(body.player.name).toBe("Ruth");
-    expect(body.player.id).toBeTruthy();
-    expect(body.token).toBeTruthy();
+    expect(body).not.toHaveProperty("token");
+    expect(setCookie).toContain(`${SESSION_COOKIE}=`);
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Lax");
   });
 
   it("rejects a duplicate name, case-insensitively", async () => {
@@ -82,10 +90,31 @@ describe("POST /api/players", () => {
   });
 });
 
-describe("PATCH /api/players/:id", () => {
-  it("renames the player with a valid token", async () => {
-    const { body } = await signIn("Ruth");
-    const renamed = await rename(body.player.id, body.token, "TileSlayer");
+describe("GET /api/me", () => {
+  it("resolves the session cookie to the player", async () => {
+    const { cookie, body } = await signIn("Ruth");
+    const res = await me(cookie);
+    expect(res.status).toBe(200);
+    expect(res.body.player).toEqual(body.player);
+  });
+
+  it("401s without a cookie", async () => {
+    const res = await app.request("/api/me");
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as ApiError).code).toBe("unauthorized");
+  });
+
+  it("401s for a ghost session whose player no longer exists", async () => {
+    const res = await me(`${SESSION_COOKIE}=no-such-token`);
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("unauthorized");
+  });
+});
+
+describe("PATCH /api/me", () => {
+  it("renames the signed-in player", async () => {
+    const { cookie, body } = await signIn("Ruth");
+    const renamed = await rename(cookie, "TileSlayer");
     expect(renamed.status).toBe(200);
     expect(renamed.body.player).toEqual({
       id: body.player.id,
@@ -94,30 +123,30 @@ describe("PATCH /api/players/:id", () => {
   });
 
   it("allows changing only the casing of your own name", async () => {
-    const { body } = await signIn("ruth");
-    const renamed = await rename(body.player.id, body.token, "Ruth");
+    const { cookie } = await signIn("ruth");
+    const renamed = await rename(cookie, "Ruth");
     expect(renamed.status).toBe(200);
     expect(renamed.body.player.name).toBe("Ruth");
   });
 
   it("rejects renaming to a name another player holds", async () => {
     await signIn("Priya");
-    const { body } = await signIn("Ruth");
-    const renamed = await rename(body.player.id, body.token, "priya");
+    const { cookie } = await signIn("Ruth");
+    const renamed = await rename(cookie, "priya");
     expect(renamed.status).toBe(409);
     expect(renamed.body.code).toBe("name_taken");
   });
 
-  it("rejects a wrong token", async () => {
-    const { body } = await signIn("Ruth");
-    const renamed = await rename(body.player.id, "not-the-token", "Sneaky");
-    expect(renamed.status).toBe(401);
-    expect(renamed.body.code).toBe("unauthorized");
+  it("rejects an invalid name", async () => {
+    const { cookie } = await signIn("Ruth");
+    const renamed = await rename(cookie, "   ");
+    expect(renamed.status).toBe(400);
+    expect(renamed.body.code).toBe("invalid_name");
   });
 
-  it("404s for an unknown player", async () => {
-    const renamed = await rename("nope", "token", "Ghost");
-    expect(renamed.status).toBe(404);
-    expect(renamed.body.code).toBe("not_found");
+  it("401s without a valid session", async () => {
+    const renamed = await rename(`${SESSION_COOKIE}=bogus`, "Sneaky");
+    expect(renamed.status).toBe(401);
+    expect(renamed.body.code).toBe("unauthorized");
   });
 });

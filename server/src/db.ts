@@ -17,6 +17,7 @@ export function openDb(path: string): DatabaseSync {
       token      TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     ) STRICT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_players_token ON players (token);
   `);
   return db;
 }
@@ -56,6 +57,14 @@ export class PlayersRepo {
     const row = this.db
       .prepare("SELECT id, name, token FROM players WHERE id = ?")
       .get(id) as PlayerRow | undefined;
+    return row && { player: { id: row.id, name: row.name }, token: row.token };
+  }
+
+  /** Resolve a session token to a player — the ghost-session gate. */
+  getByToken(token: string): { player: Player; token: string } | undefined {
+    const row = this.db
+      .prepare("SELECT id, name, token FROM players WHERE token = ?")
+      .get(token) as PlayerRow | undefined;
     return row && { player: { id: row.id, name: row.name }, token: row.token };
   }
 
