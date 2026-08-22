@@ -121,6 +121,42 @@ describe('create board page', () => {
     expect(submit().disabled).toBe(true)
   })
 
+  it('spells out why submit is disabled while pieces are missing', () => {
+    mockApi()
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /3×3/ }))
+    // Nothing filled in yet: both gaps are listed.
+    expect(
+      screen.getByText('Still needed: a board name · 8 more terms'),
+    ).toBeDefined()
+    fillTerms(TERMS_8)
+    expect(screen.getByText('Still needed: a board name')).toBeDefined()
+    expect(
+      (screen.getByRole('button', { name: /Print it/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true)
+    fillName('Standup Standoff')
+    // Complete form: the hint disappears and submit unlocks.
+    expect(screen.queryByText(/Still needed/)).toBeNull()
+    expect(
+      (screen.getByRole('button', { name: /Print it/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false)
+  })
+
+  it('counts the term gap in the still-needed line, both short and over', () => {
+    mockApi()
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /3×3/ }))
+    fillName('Standup Standoff')
+    fillTerms(TERMS_8.slice(0, 5))
+    expect(screen.getByText('Still needed: 3 more terms')).toBeDefined()
+    fillTerms(TERMS_8.slice(0, 7))
+    expect(screen.getByText('Still needed: 1 more term')).toBeDefined()
+    fillTerms([...TERMS_8, 'one too many'])
+    expect(screen.getByText('Still needed: 1 too many terms')).toBeDefined()
+  })
+
   it('fills the preview in order with FREE at the center', () => {
     mockApi()
     renderPage()

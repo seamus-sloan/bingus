@@ -43,6 +43,10 @@ export function BoardForm({
   const [termsText, setTermsText] = useState(initial?.terms.join('\n') ?? '')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // Drives the name field's attention state: an empty name only turns
+  // magenta once the player has moved on to the terms or tried to submit —
+  // not the moment the form loads.
+  const [nudgeName, setNudgeName] = useState(false)
 
   const terms = termsText
     .split('\n')
@@ -52,8 +56,20 @@ export function BoardForm({
   const countRight = terms.length === required
   const center = Math.floor((size * size) / 2)
 
+  // What still blocks the submit button — rendered next to it so the
+  // disabled state never has to explain itself.
+  const missing: string[] = []
+  if (!name.trim()) missing.push('a board name')
+  if (terms.length < required) {
+    const short = required - terms.length
+    missing.push(`${short} more term${short === 1 ? '' : 's'}`)
+  } else if (terms.length > required) {
+    missing.push(`${terms.length - required} too many terms`)
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setNudgeName(true)
     setError(null)
     const parsed = schema.safeParse({ name, size, terms })
     if (!parsed.success) {
@@ -85,7 +101,9 @@ export function BoardForm({
           </label>
           <input
             id="board-name"
-            className={styles.input}
+            className={
+              nudgeName && !name.trim() ? styles.inputAttention : styles.input
+            }
             placeholder="Standup Standoff"
             value={name}
             maxLength={BOARD_NAME_MAX}
@@ -132,7 +150,10 @@ export function BoardForm({
             rows={11}
             placeholder="one spicy term per line"
             value={termsText}
-            onChange={(e) => setTermsText(e.target.value)}
+            onChange={(e) => {
+              setTermsText(e.target.value)
+              setNudgeName(true)
+            }}
           />
           <p className={styles.hint}>
             The center tile is a FREE space — we throw it in for nothing. Make
@@ -162,6 +183,11 @@ export function BoardForm({
             Back
           </button>
         </div>
+        {missing.length > 0 && (
+          <p className={styles.stillNeeded} role="status">
+            Still needed: {missing.join(' · ')}
+          </p>
+        )}
       </form>
       <aside className={styles.previewCol}>
         <div className={styles.previewLabel}>LIVE PREVIEW — SHUFFLED PER PLAYER</div>

@@ -128,10 +128,10 @@
   padding: 22px;
 }
 
-.newRibbon {
+.newRibbon,
+.newRibbonLeft {
   position: absolute;
   top: -12px;
-  right: 16px;
   padding: 4px 13px;
   background: var(--magenta);
   color: #fff;
@@ -140,8 +140,109 @@
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 1px;
-  transform: rotate(3deg);
   box-shadow: 3px 3px 0 var(--ink);
+}
+
+.newRibbon {
+  right: 16px;
+  transform: rotate(3deg);
+}
+
+/* On the player's own cards the action icons take the upper-right, so the
+   ribbon swings to the left edge instead of colliding with them. */
+.newRibbonLeft {
+  left: 16px;
+  transform: rotate(-3deg);
+}
+
+.cardActions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 6px;
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: #fff;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 9px;
+  box-shadow: 2px 2px 0 rgba(43, 27, 51, 0.2);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--cream);
+}
+
+.iconButton:active {
+  translate: 1px 1px;
+  box-shadow: 1px 1px 0 rgba(43, 27, 51, 0.2);
+}
+
+/* Covers the card content (inside its border) while a delete waits for a
+   yes/no. */
+.confirmOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  padding: 22px;
+  background: #fff;
+  border-radius: 19px;
+}
+
+.confirmText {
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.4;
+  margin: 0;
+  word-break: break-word;
+}
+
+.confirmDelete,
+.confirmKeep {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(43, 27, 51, 0.25);
+}
+
+.confirmDelete {
+  background: var(--magenta);
+  color: #fff;
+}
+
+.confirmKeep {
+  background: #fff;
+  color: var(--ink);
+}
+
+.confirmDelete:active,
+.confirmKeep:active {
+  translate: 1px 1px;
+  box-shadow: 2px 2px 0 rgba(43, 27, 51, 0.25);
+}
+
+.confirmButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .preview {
@@ -194,25 +295,6 @@
 .playsChip {
   background: #fff;
   color: var(--muted);
-}
-
-.editChip {
-  padding: 4px 12px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-  background: #fff;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.editChip:hover {
-  background: var(--yellow);
-}
-
-.editChip:active {
-  translate: 1px 1px;
 }
 
 .playCta {
