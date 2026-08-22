@@ -2,17 +2,22 @@ import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import {
   CreateBoardRequestSchema,
+  CreateGameRequestSchema,
   CreatePlayerRequestSchema,
   ListBoardsQuerySchema,
   RenamePlayerRequestSchema,
+  UpdateBoardRequestSchema,
   type ApiError,
   type CreateBoardResponse,
+  type CreateGameResponse,
   type CreatePlayerResponse,
+  type GetBoardResponse,
   type ListBoardsResponse,
   type MeResponse,
   type StatsResponse,
 } from "@bingus/shared";
 import type { BoardsRepo, PlayersRepo } from "./db.ts";
+import type { GameManager } from "./games.ts";
 
 // The session cookie holds the player's token. httpOnly keeps it out of
 // reach of client-side JS; the browser sends it on every same-origin request
@@ -22,7 +27,11 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // a year of trash talk
 
 // HTTP surface: REST endpoints live here (players, board archive, health).
 // Realtime traffic goes through Socket.IO — see socket.ts.
-export function createApp(players: PlayersRepo, boards: BoardsRepo) {
+export function createApp(
+  players: PlayersRepo,
+  boards: BoardsRepo,
+  games: GameManager,
+) {
   const app = new Hono();
 
   const currentPlayer = (c: Context) => {
@@ -38,8 +47,7 @@ export function createApp(players: PlayersRepo, boards: BoardsRepo) {
     c.json({
       players: players.count(),
       boards: boards.count(),
-      // Live games land with the lobby.
-      liveGames: 0,
+      liveGames: games.liveCount(),
     } satisfies StatsResponse),
   );
 
@@ -71,6 +79,54 @@ export function createApp(players: PlayersRepo, boards: BoardsRepo) {
     }
     const board = boards.create(body.data, me.player.id);
     return c.json({ board } satisfies CreateBoardResponse, 201);
+  });
+
+  app.get("/api/boards/:id", (c) => {
+    const found = boards.get(c.req.param("id"));
+    if (!found) return c.json(boardNotFound(), 404);
+    return c.json({ board: found.board } satisfies GetBoardResponse);
+  });
+
+  app.patch("/api/boards/:id", async (c) => {
+    const me = currentPlayer(c);
+    if (!me) return c.json(unauthorized(), 401);
+    const found = boards.get(c.req.param("id"));
+    if (!found) return c.json(boardNotFound(), 404);
+    if (found.createdById !== me.player.id) {
+      return c.json(
+        {
+          code: "unauthorized",
+          error: "Only the board's creator can edit it.",
+        } satisfies ApiError,
+        403,
+      );
+    }
+    const body = UpdateBoardRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!body.success) {
+      return c.json(
+        {
+          code: "invalid_board",
+          error: body.error.issues[0]?.message ?? "That edit won't print.",
+        } satisfies ApiError,
+        400,
+      );
+    }
+    const board = boards.update(found.board.id, body.data);
+    return c.json({ board } satisfies GetBoardResponse);
+  });
+
+  app.post("/api/games", async (c) => {
+    const me = currentPlayer(c);
+    if (!me) return c.json(unauthorized(), 401);
+    const body = CreateGameRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    const found = body.success ? boards.get(body.data.boardId) : undefined;
+    if (!found) return c.json(boardNotFound(), 404);
+    const room = games.create(found.board, me.player);
+    return c.json({ code: room.code } satisfies CreateGameResponse, 201);
   });
 
   app.post("/api/players", async (c) => {
@@ -123,6 +179,10 @@ function nameTaken(name: string): ApiError {
     code: "name_taken",
     error: `"${name}" is taken. Choose more wisely.`,
   };
+}
+
+function boardNotFound(): ApiError {
+  return { code: "not_found", error: "No such board in the archive." };
 }
 
 function unauthorized(): ApiError {

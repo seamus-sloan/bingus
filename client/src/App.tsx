@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { BoardArchivePage } from './pages/BoardArchivePage'
 import { CreateBoardPage } from './pages/CreateBoardPage'
+import { GameRoute } from './pages/GameRoute'
 import { HomePage } from './pages/HomePage'
 import { SignInPage } from './pages/SignInPage'
 import { SessionProvider, useSession } from './lib/session'
@@ -17,6 +18,7 @@ function Screens() {
       <Route path="/" element={<HomePage />} />
       <Route path="/boards" element={<BoardArchivePage />} />
       <Route path="/boards/new" element={<CreateBoardPage />} />
+      <Route path="/game/:code" element={<GameRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

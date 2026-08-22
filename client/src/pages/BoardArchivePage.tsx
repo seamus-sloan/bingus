@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import type { Board } from '@bingus/shared'
 import { AppHeader } from '../components/AppHeader'
-import { listBoards } from '../lib/api'
+import { createGame, listBoards } from '../lib/api'
 import styles from './BoardArchivePage.module.css'
 
 // Mockup 1c — pick a board from the archive (step 1 of starting a game).
@@ -154,9 +154,13 @@ export function BoardArchivePage() {
       .finally(() => setLoadingMore(false))
   }
 
-  function tablesComingSoon() {
-    setToast("Game tables aren't open yet. Soon.")
-    window.setTimeout(() => setToast(null), 2500)
+  function playBoard(boardId: string) {
+    createGame(boardId)
+      .then(({ code }) => navigate(`/game/${code}`))
+      .catch(() => {
+        setToast("Couldn't open a table. Try again in a second.")
+        window.setTimeout(() => setToast(null), 2500)
+      })
   }
 
   const hasMore = total !== null && boards.length < total
@@ -207,7 +211,7 @@ export function BoardArchivePage() {
               key={board.id}
               board={board}
               isNew={fresh.has(board.id)}
-              onPlay={tablesComingSoon}
+              onPlay={() => playBoard(board.id)}
             />
           ))}
           {emptyArchive && (

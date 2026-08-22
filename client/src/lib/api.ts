@@ -1,18 +1,24 @@
 import {
   ApiErrorSchema,
   CreateBoardResponseSchema,
+  CreateGameResponseSchema,
   CreatePlayerResponseSchema,
+  GetBoardResponseSchema,
   ListBoardsResponseSchema,
   MeResponseSchema,
   type ApiErrorCode,
   type CreateBoardRequest,
   type CreateBoardResponse,
+  type CreateGameRequest,
+  type CreateGameResponse,
   type CreatePlayerRequest,
   type CreatePlayerResponse,
+  type GetBoardResponse,
   type ListBoardsQuery,
   type ListBoardsResponse,
   type MeResponse,
   type RenamePlayerRequest,
+  type UpdateBoardRequest,
   StatsResponseSchema,
   type StatsResponse,
 } from '@bingus/shared'
@@ -68,6 +74,35 @@ export function createBoard(
     '/api/boards',
     { method: 'POST', body: JSON.stringify(board) },
     (data) => CreateBoardResponseSchema.parse(data),
+  )
+}
+
+export function getBoard(id: string): Promise<GetBoardResponse> {
+  return request(`/api/boards/${id}`, {}, (data) =>
+    GetBoardResponseSchema.parse(data),
+  )
+}
+
+export function updateBoard(
+  id: string,
+  board: UpdateBoardRequest,
+): Promise<GetBoardResponse> {
+  return request(
+    `/api/boards/${id}`,
+    { method: 'PATCH', body: JSON.stringify(board) },
+    (data) => GetBoardResponseSchema.parse(data),
+  )
+}
+
+// Open a live table for a board; the caller navigates to /game/:code.
+export function createGame(boardId: string): Promise<CreateGameResponse> {
+  return request(
+    '/api/games',
+    {
+      method: 'POST',
+      body: JSON.stringify({ boardId } satisfies CreateGameRequest),
+    },
+    (data) => CreateGameResponseSchema.parse(data),
   )
 }
 

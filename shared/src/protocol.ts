@@ -24,6 +24,8 @@ export type Player = z.infer<typeof PlayerSchema>;
 //
 // GET  /api/boards?search=&limit=&offset= — browse the archive (newest first).
 // POST /api/boards — print a fresh board (requires a session).
+// GET  /api/boards/:id — fetch one board.
+// PATCH /api/boards/:id — edit a board you created (same shape as create).
 
 export const BOARD_SIZES = [3, 4, 5] as const;
 export const BoardSizeSchema = z.union([
@@ -95,6 +97,91 @@ export type CreateBoardRequest = z.infer<typeof CreateBoardRequestSchema>;
 export const CreateBoardResponseSchema = z.object({ board: BoardSchema });
 export type CreateBoardResponse = z.infer<typeof CreateBoardResponseSchema>;
 
+// Editing reuses the create shape wholesale; the server additionally checks
+// that the editor is the board's creator.
+export const UpdateBoardRequestSchema = CreateBoardRequestSchema;
+export type UpdateBoardRequest = CreateBoardRequest;
+
+export const GetBoardResponseSchema = z.object({ board: BoardSchema });
+export type GetBoardResponse = z.infer<typeof GetBoardResponseSchema>;
+
+// --- Games ----------------------------------------------------------------
+// A game is a live table for one board. It lives in server memory: created
+// via REST, then everything else happens over the socket. Every player gets
+// the board's terms shuffled by a server-held seed; index `freeIndex(size)`
+// is the FREE tile. Marks are self-reported; the server is the referee and
+// detects row / column / diagonal / blackout wins.
+//
+// POST /api/games {boardId} — open a table (host = session player) → {code}.
+
+export const GAME_CODE_PATTERN = /^BNGS-\d{3}$/;
+
+/** The FREE tile's index in a player's card (center for odd sizes). */
+export function freeIndex(size: BoardSize): number {
+  return Math.floor((size * size) / 2);
+}
+
+export const GameStatusSchema = z.enum(["lobby", "playing", "finished"]);
+export type GameStatus = z.infer<typeof GameStatusSchema>;
+
+export const WinPatternSchema = z.enum(["row", "column", "diagonal", "blackout"]);
+export type WinPattern = z.infer<typeof WinPatternSchema>;
+
+export const CreateGameRequestSchema = z.object({ boardId: z.string() });
+export type CreateGameRequest = z.infer<typeof CreateGameRequestSchema>;
+
+export const CreateGameResponseSchema = z.object({ code: z.string() });
+export type CreateGameResponse = z.infer<typeof CreateGameResponseSchema>;
+
+// Everything about a player that the whole table can see. Cards are public
+// by design — rivals' mini boards and the "peek" feature depend on it.
+export const GamePlayerSchema = z.object({
+  player: PlayerSchema,
+  /** The board's terms in this player's shuffled order (FREE tile omitted — it sits at freeIndex). */
+  card: z.array(z.string()),
+  /** Marked cell indices (0..size²-1); the FREE tile is always implicitly marked. */
+  marks: z.array(z.number().int().nonnegative()),
+  connected: z.boolean(),
+  isHost: z.boolean(),
+});
+export type GamePlayer = z.infer<typeof GamePlayerSchema>;
+
+export const GameWinnerSchema = z.object({
+  playerId: z.string(),
+  pattern: WinPatternSchema,
+  /** Winning cell indices (empty for blackout). */
+  line: z.array(z.number().int().nonnegative()),
+});
+export type GameWinner = z.infer<typeof GameWinnerSchema>;
+
+export const GameStateSchema = z.object({
+  code: z.string(),
+  board: z.object({
+    id: z.string(),
+    name: BoardNameSchema,
+    size: BoardSizeSchema,
+  }),
+  status: GameStatusSchema,
+  players: z.array(GamePlayerSchema),
+  winner: GameWinnerSchema.nullable(),
+});
+export type GameState = z.infer<typeof GameStateSchema>;
+
+export const ChatMessageSchema = z.object({
+  player: PlayerSchema,
+  text: z.string().trim().min(1).max(300),
+  at: z.string(), // ISO 8601
+});
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+/** Ack payload for game:join — full state plus recent chat backlog. */
+export interface GameJoinOk {
+  state: GameState;
+  chat: ChatMessage[];
+}
+export type GameJoinResult = GameJoinOk | { error: string };
+export type GameAck = { ok: true; state: GameState } | { error: string };
+
 // --- REST: stats ---------------------------------------------------------
 // GET /api/stats — the Home screen's live numbers. `liveGames` stays 0 until
 // game tables exist.
@@ -128,16 +215,36 @@ export const RenamePlayerRequestSchema = z.object({ name: PlayerNameSchema });
 export type RenamePlayerRequest = z.infer<typeof RenamePlayerRequestSchema>;
 
 export const ApiErrorSchema = z.object({
-  code: z.enum(["invalid_name", "name_taken", "invalid_board", "unauthorized"]),
+  code: z.enum([
+    "invalid_name",
+    "name_taken",
+    "invalid_board",
+    "not_found",
+    "unauthorized",
+  ]),
   error: z.string(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
 export type ApiErrorCode = ApiError["code"];
 
 // --- Socket.IO typed-event maps ------------------------------------------
-// Realtime game events (lobby presence, tile marks, chat…) land here as the
-// screens that need them are built.
+// The socket authenticates via the session cookie on the handshake. A socket
+// joins one game room at a time; the server broadcasts the full public state
+// on every change (friends-scale tables — simplicity beats deltas).
 
-export type ClientToServerEvents = Record<string, never>;
+export interface ClientToServerEvents {
+  "game:join": (code: string, ack: (result: GameJoinResult) => void) => void;
+  "game:start": (ack: (result: GameAck) => void) => void;
+  "game:mark": (
+    cell: number,
+    marked: boolean,
+    ack: (result: GameAck) => void,
+  ) => void;
+  "game:chat": (text: string) => void;
+  "game:leave": () => void;
+}
 
-export type ServerToClientEvents = Record<string, never>;
+export interface ServerToClientEvents {
+  "game:state": (state: GameState) => void;
+  "game:chat": (message: ChatMessage) => void;
+}

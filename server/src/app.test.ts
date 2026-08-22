@@ -11,12 +11,15 @@ import type {
 } from "@bingus/shared";
 import { createApp, SESSION_COOKIE } from "./app.ts";
 import { BoardsRepo, openDb, PlayersRepo } from "./db.ts";
+import { GameManager } from "./games.ts";
 
 let app: Hono;
+let games: GameManager;
 
 beforeEach(() => {
   const db = openDb(":memory:");
-  app = createApp(new PlayersRepo(db), new BoardsRepo(db));
+  games = new GameManager();
+  app = createApp(new PlayersRepo(db), new BoardsRepo(db), games);
 });
 
 // Test-only view of a response body: success and error fields both visible,
@@ -76,6 +79,88 @@ async function listBoards(qs = "") {
     body: (await res.json()) as Body<ListBoardsResponse>,
   };
 }
+
+describe("board editing", () => {
+  it("fetches one board by id", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    const res = await app.request(`/api/boards/${created.body.board.id}`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Body<CreateBoardResponse>).board.name).toBe(
+      "Standup Standoff",
+    );
+  });
+
+  it("lets the creator edit their board", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    const res = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "PATCH",
+      headers: { Cookie: cookie },
+      body: JSON.stringify({
+        name: "Standup Standoff 2",
+        size: 3,
+        terms: TERMS8.map((t) => t + "!"),
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Body<CreateBoardResponse>;
+    expect(body.board.name).toBe("Standup Standoff 2");
+    expect(body.board.terms).toEqual(TERMS8.map((t) => t + "!"));
+  });
+
+  it("refuses edits from anyone but the creator", async () => {
+    const ruth = await signIn("Ruth");
+    const created = await createBoard(ruth.cookie);
+    const priya = await signIn("Priya");
+    const res = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "PATCH",
+      headers: { Cookie: priya.cookie },
+      body: JSON.stringify({ name: "Hijacked", size: 3, terms: TERMS8 }),
+    });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as ApiError).code).toBe("unauthorized");
+  });
+
+  it("404s for an unknown board", async () => {
+    const res = await app.request("/api/boards/nope");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as ApiError).code).toBe("not_found");
+  });
+});
+
+describe("games", () => {
+  it("opens a table for a board and counts it live", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    const res = await app.request("/api/games", {
+      method: "POST",
+      headers: { Cookie: cookie },
+      body: JSON.stringify({ boardId: created.body.board.id }),
+    });
+    expect(res.status).toBe(201);
+    const { code } = (await res.json()) as { code: string };
+    expect(code).toMatch(/^BNGS-\d{3}$/);
+    expect(games.get(code)?.hostId).toBeTruthy();
+    const stats = await app.request("/api/stats");
+    expect(((await stats.json()) as { liveGames: number }).liveGames).toBe(1);
+  });
+
+  it("requires a session and a real board", async () => {
+    const noAuth = await app.request("/api/games", {
+      method: "POST",
+      body: JSON.stringify({ boardId: "x" }),
+    });
+    expect(noAuth.status).toBe(401);
+    const { cookie } = await signIn("Ruth");
+    const badBoard = await app.request("/api/games", {
+      method: "POST",
+      headers: { Cookie: cookie },
+      body: JSON.stringify({ boardId: "nope" }),
+    });
+    expect(badBoard.status).toBe(404);
+  });
+});
 
 describe("boards", () => {
   it("creates a board and lists it newest-first", async () => {

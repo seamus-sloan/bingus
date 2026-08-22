@@ -37,6 +37,9 @@ function mockApi(boards: Board[] = []) {
           jsonResponse(200, { player: { id: 'p1', name: 'Ruth' } }),
         )
       }
+      if (url === '/api/games' && method === 'POST') {
+        return Promise.resolve(jsonResponse(201, { code: 'BNGS-421' }))
+      }
       if (url.startsWith('/api/boards') && method === 'GET') {
         const params = new URL(url, 'http://test').searchParams
         const search = params.get('search')?.toLowerCase() ?? ''
@@ -68,6 +71,7 @@ function renderArchive(initialEntry: string | { pathname: string; state?: unknow
         <Routes>
           <Route path="/boards" element={<BoardArchivePage />} />
           <Route path="/boards/new" element={<h2>Print a fresh board</h2>} />
+          <Route path="/game/:code" element={<h2>Game route probe</h2>} />
         </Routes>
       </SessionProvider>
     </MemoryRouter>,
@@ -175,14 +179,18 @@ describe('board archive', () => {
     ).toBeDefined()
   })
 
-  it('play raises the tables-coming-soon toast', async () => {
-    mockApi([makeBoard(1)])
+  it('play opens a table and navigates to the game route', async () => {
+    const fetchMock = mockApi([makeBoard(1)])
     renderArchive()
     fireEvent.click(
       await screen.findByRole('button', { name: /Play this board/ }),
     )
-    expect((await screen.findByRole('status')).textContent).toContain(
-      "aren't open yet",
+    expect(
+      await screen.findByRole('heading', { name: 'Game route probe' }),
+    ).toBeDefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/games',
+      expect.objectContaining({ method: 'POST' }),
     )
   })
 

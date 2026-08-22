@@ -97,6 +97,7 @@ interface BoardRow {
   name: string;
   size: number;
   terms: string;
+  created_by: string;
   created_by_name: string;
   plays: number;
   created_at: string;
@@ -115,7 +116,7 @@ function rowToBoard(row: BoardRow): Board {
 }
 
 const BOARD_SELECT = `
-  SELECT b.id, b.name, b.size, b.terms, b.plays, b.created_at,
+  SELECT b.id, b.name, b.size, b.terms, b.created_by, b.plays, b.created_at,
          p.name AS created_by_name
   FROM boards b JOIN players p ON p.id = b.created_by
 `;
@@ -168,6 +169,31 @@ export class BoardsRepo {
       )
       .all(...params, query.limit, query.offset) as unknown as BoardRow[];
     return { boards: rows.map(rowToBoard), total };
+  }
+
+  /** One board plus its creator's player id (for ownership checks). */
+  get(id: string): { board: Board; createdById: string } | undefined {
+    const row = this.db
+      .prepare(`${BOARD_SELECT} WHERE b.id = ?`)
+      .get(id) as unknown as BoardRow | undefined;
+    return row && { board: rowToBoard(row), createdById: row.created_by };
+  }
+
+  update(
+    id: string,
+    input: { name: string; size: BoardSize; terms: string[] },
+  ): Board {
+    this.db
+      .prepare("UPDATE boards SET name = ?, size = ?, terms = ? WHERE id = ?")
+      .run(input.name, input.size, JSON.stringify(input.terms), id);
+    const row = this.db
+      .prepare(`${BOARD_SELECT} WHERE b.id = ?`)
+      .get(id) as unknown as BoardRow;
+    return rowToBoard(row);
+  }
+
+  incrementPlays(id: string): void {
+    this.db.prepare("UPDATE boards SET plays = plays + 1 WHERE id = ?").run(id);
   }
 
   count(): number {
