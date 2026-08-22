@@ -79,7 +79,11 @@ export function attachSocket(
         return;
       }
       leaveCurrent();
-      room.join(socket.data.player);
+      const seated = room.join(socket.data.player);
+      if ("error" in seated) {
+        ack(seated);
+        return;
+      }
       socket.data.gameCode = room.code;
       void socket.join(room.code);
       ack({ state: room.toState(), chat: room.chat });
@@ -100,6 +104,23 @@ export function attachSocket(
         return;
       }
       deps.boards.incrementPlays(room.board.id);
+      ack({ ok: true, state: room.toState() });
+      broadcast(room.code);
+    });
+
+    socket.on("game:rematch", (ack) => {
+      if (typeof ack !== "function") return;
+      const code = socket.data.gameCode;
+      const room = code ? deps.games.get(code) : undefined;
+      if (!room) {
+        ack({ error: "You're not at a table." });
+        return;
+      }
+      const result = room.rematch(socket.data.player.id);
+      if ("error" in result) {
+        ack(result);
+        return;
+      }
       ack({ ok: true, state: room.toState() });
       broadcast(room.code);
     });

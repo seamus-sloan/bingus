@@ -161,6 +161,28 @@ describe("games", () => {
     expect(badBoard.status).toBe(404);
   });
 
+  it("lists joinable tables", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    const opened = await app.request("/api/games", {
+      method: "POST",
+      headers: { Cookie: cookie },
+      body: JSON.stringify({ boardId: created.body.board.id }),
+    });
+    const { code } = (await opened.json()) as { code: string };
+    const res = await app.request("/api/games");
+    expect(res.status).toBe(200);
+    const { games: list } = (await res.json()) as {
+      games: { code: string; hostName: string; status: string }[];
+    };
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      code,
+      hostName: "Ruth",
+      status: "lobby",
+    });
+  });
+
   it("propagates a profile rename into live game seats", async () => {
     const { cookie } = await signIn("Ruth");
     const created = await createBoard(cookie);

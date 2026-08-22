@@ -5,6 +5,7 @@ import {
   CreatePlayerResponseSchema,
   GetBoardResponseSchema,
   ListBoardsResponseSchema,
+  ListGamesResponseSchema,
   MeResponseSchema,
   type ApiErrorCode,
   type CreateBoardRequest,
@@ -16,6 +17,7 @@ import {
   type GetBoardResponse,
   type ListBoardsQuery,
   type ListBoardsResponse,
+  type ListGamesResponse,
   type MeResponse,
   type RenamePlayerRequest,
   type UpdateBoardRequest,
@@ -92,6 +94,10 @@ export function updateBoard(
     { method: 'PATCH', body: JSON.stringify(board) },
     (data) => GetBoardResponseSchema.parse(data),
   )
+}
+
+export function listGames(): Promise<ListGamesResponse> {
+  return request('/api/games', {}, (data) => ListGamesResponseSchema.parse(data))
 }
 
 // Open a live table for a board; the caller navigates to /game/:code.

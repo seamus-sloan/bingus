@@ -10,6 +10,7 @@ export interface GameRoomView {
   state: GameState
   chat: ChatMessage[]
   start: () => Promise<string | null>
+  rematch: () => Promise<string | null>
   mark: (cell: number, marked: boolean) => Promise<string | null>
   sendChat: (text: string) => void
 }
@@ -71,6 +72,16 @@ export function useGameRoom(code: string): GameRoomStatus {
     [],
   )
 
+  const rematch = useCallback(
+    () =>
+      new Promise<string | null>((resolve) => {
+        socket.emit('game:rematch', (result) =>
+          resolve('error' in result ? result.error : null),
+        )
+      }),
+    [],
+  )
+
   const mark = useCallback(
     (cell: number, marked: boolean) =>
       new Promise<string | null>((resolve) => {
@@ -93,5 +104,5 @@ export function useGameRoom(code: string): GameRoomStatus {
 
   if (error) return { phase: 'error', message: error }
   if (!state) return { phase: 'joining' }
-  return { phase: 'ready', room: { state, chat, start, mark, sendChat } }
+  return { phase: 'ready', room: { state, chat, start, rematch, mark, sendChat } }
 }

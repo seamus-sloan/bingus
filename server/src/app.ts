@@ -13,6 +13,7 @@ import {
   type CreatePlayerResponse,
   type GetBoardResponse,
   type ListBoardsResponse,
+  type ListGamesResponse,
   type MeResponse,
   type StatsResponse,
 } from "@bingus/shared";
@@ -128,6 +129,10 @@ export function createApp(
     const room = games.create(found.board, me.player);
     return c.json({ code: room.code } satisfies CreateGameResponse, 201);
   });
+
+  app.get("/api/games", (c) =>
+    c.json({ games: games.list() } satisfies ListGamesResponse),
+  );
 
   app.post("/api/players", async (c) => {
     const body = CreatePlayerRequestSchema.safeParse(

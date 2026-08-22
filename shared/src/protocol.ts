@@ -113,8 +113,10 @@ export type GetBoardResponse = z.infer<typeof GetBoardResponseSchema>;
 // detects row / column / diagonal / blackout wins.
 //
 // POST /api/games {boardId} — open a table (host = session player) → {code}.
+// GET  /api/games — list joinable tables (lobby + playing, newest first).
 
 export const GAME_CODE_PATTERN = /^BNGS-\d{3}$/;
+export const GAME_MAX_PLAYERS = 8;
 
 /** The FREE tile's index in a player's card (center for odd sizes). */
 export function freeIndex(size: BoardSize): number {
@@ -129,6 +131,24 @@ export type WinPattern = z.infer<typeof WinPatternSchema>;
 
 export const CreateGameRequestSchema = z.object({ boardId: z.string() });
 export type CreateGameRequest = z.infer<typeof CreateGameRequestSchema>;
+
+// What the live-tables screen shows per joinable game.
+export const GameSummarySchema = z.object({
+  code: z.string(),
+  boardName: BoardNameSchema,
+  size: BoardSizeSchema,
+  hostName: z.string(),
+  status: z.enum(["lobby", "playing"]),
+  playerNames: z.array(z.string()),
+  createdAt: z.string(), // ISO 8601
+  startedAt: z.string().nullable(),
+});
+export type GameSummary = z.infer<typeof GameSummarySchema>;
+
+export const ListGamesResponseSchema = z.object({
+  games: z.array(GameSummarySchema),
+});
+export type ListGamesResponse = z.infer<typeof ListGamesResponseSchema>;
 
 export const CreateGameResponseSchema = z.object({ code: z.string() });
 export type CreateGameResponse = z.infer<typeof CreateGameResponseSchema>;
@@ -241,6 +261,9 @@ export interface ClientToServerEvents {
     ack: (result: GameAck) => void,
   ) => void;
   "game:chat": (text: string) => void;
+  /** Reset a finished table for another round (any seated player). Fresh
+   * shuffled cards for everyone; the room returns to the lobby. */
+  "game:rematch": (ack: (result: GameAck) => void) => void;
   "game:leave": () => void;
 }
 

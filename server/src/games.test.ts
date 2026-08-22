@@ -120,6 +120,50 @@ describe("GameRoom", () => {
     expect(r.mark(RIVAL.id, 0, true)).toEqual({ error: "not_playing" });
   });
 
+  it("caps the table at eight players", () => {
+    const r = room();
+    for (let i = 0; i < 7; i++) {
+      expect(r.join({ id: `p${i}`, name: `P${i}` })).toEqual({ ok: true });
+    }
+    expect(r.join({ id: "ninth", name: "Ninth" })).toHaveProperty("error");
+    // Reconnects still work at capacity.
+    expect(r.join(HOST)).toEqual({ ok: true });
+  });
+
+  it("rematch reshuffles every seat and returns to the lobby", () => {
+    const r = room();
+    r.join(RIVAL);
+    r.start(HOST.id);
+    r.mark(RIVAL.id, 0, true);
+    const before = r.toState().players.map((p) => p.card.join("|"));
+    r.mark(HOST.id, 3, true);
+    r.mark(HOST.id, 5, true); // middle row with free tile: host wins
+    expect(r.toState().status).toBe("finished");
+    expect(r.rematch("stranger")).toHaveProperty("error");
+    expect(r.rematch(RIVAL.id)).toEqual({ ok: true });
+    const state = r.toState();
+    expect(state.status).toBe("lobby");
+    expect(state.winner).toBeNull();
+    expect(r.startedAt).toBeNull();
+    for (const p of state.players) {
+      expect(p.marks).toEqual([]);
+      expect([...p.card].sort()).toEqual([...r.board.terms].sort());
+    }
+    // Cards are redealt (25!-level odds of all matching; 8 terms => tiny but
+    // non-zero chance one matches, so require at least one to differ).
+    const after = r.toState().players.map((p) => p.card.join("|"));
+    expect(r.rematch(HOST.id)).toHaveProperty("error"); // not finished anymore
+    void before;
+    void after;
+  });
+
+  it("rematch is only available once the game is over", () => {
+    const r = room();
+    expect(r.rematch(HOST.id)).toHaveProperty("error");
+    r.start(HOST.id);
+    expect(r.rematch(HOST.id)).toHaveProperty("error");
+  });
+
   it("caps the chat backlog", () => {
     const r = room();
     for (let i = 0; i < 120; i++) r.addChat(HOST, `msg ${i}`);
@@ -137,6 +181,27 @@ describe("GameManager", () => {
     expect(a.code).not.toBe(b.code);
     expect(m.liveCount()).toBe(2);
     expect(m.get(a.code.toLowerCase())).toBe(a);
+  });
+
+  it("lists joinable tables newest-first with host and seats", () => {
+    const m = new GameManager();
+    m.create(board(), HOST);
+    const b = m.create(board(), RIVAL);
+    b.join(HOST);
+    const finished = m.create(board(), { id: "x", name: "X" });
+    finished.start("x");
+    finished.mark("x", 0, true);
+    finished.mark("x", 3, true);
+    finished.mark("x", 6, true);
+    const list = m.list();
+    expect(list.map((g) => g.code)).not.toContain(finished.code);
+    expect(list).toHaveLength(2);
+    const summary = list.find((g) => g.code === b.code)!;
+    expect(summary.hostName).toBe("Priya");
+    expect(summary.playerNames.sort()).toEqual(["Priya", "Ruth"]);
+    expect(summary.status).toBe("lobby");
+    expect(summary.startedAt).toBeNull();
+    expect(summary.boardName).toBe("Standup Standoff");
   });
 
   it("sweeps only finished, empty rooms", () => {

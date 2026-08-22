@@ -27,6 +27,7 @@ function makeRoom(overrides: Partial<GameState> = {}): GameRoomView {
     start: vi.fn().mockResolvedValue(null),
     mark: vi.fn().mockResolvedValue(null),
     sendChat: vi.fn(),
+    rematch: vi.fn().mockResolvedValue(null),
   }
 }
 

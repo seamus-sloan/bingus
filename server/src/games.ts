@@ -1,10 +1,12 @@
 import {
   freeIndex,
+  GAME_MAX_PLAYERS,
   type Board,
   type ChatMessage,
   type GamePlayer,
   type GameState,
   type GameStatus,
+  type GameSummary,
   type GameWinner,
   type Player,
 } from "@bingus/shared";
@@ -30,6 +32,8 @@ export class GameRoom {
   status: GameStatus = "lobby";
   winner: GameWinner | null = null;
   chat: ChatMessage[] = [];
+  readonly createdAt = new Date().toISOString();
+  startedAt: string | null = null;
   private players = new Map<string, PlayerState>();
 
   constructor(
@@ -39,12 +43,15 @@ export class GameRoom {
   ) {}
 
   /** Add (or reconnect) a player. New players get a freshly shuffled card. */
-  join(player: Player): void {
+  join(player: Player): { ok: true } | { error: string } {
     const existing = this.players.get(player.id);
     if (existing) {
       existing.connected = true;
       existing.player = player; // pick up renames
-      return;
+      return { ok: true };
+    }
+    if (this.players.size >= GAME_MAX_PLAYERS) {
+      return { error: "Table's full — eight is the legal limit." };
     }
     this.players.set(player.id, {
       player,
@@ -53,6 +60,7 @@ export class GameRoom {
       connected: true,
       isHost: player.id === this.hostId,
     });
+    return { ok: true };
   }
 
   disconnect(playerId: string): void {
@@ -78,6 +86,23 @@ export class GameRoom {
     if (this.status !== "lobby")
       return { error: "This game already started." };
     this.status = "playing";
+    this.startedAt = new Date().toISOString();
+    return { ok: true };
+  }
+
+  /** Run it back: fresh cards for every seat, back to the lobby. */
+  rematch(byPlayerId: string): { ok: true } | { error: string } {
+    if (!this.players.has(byPlayerId))
+      return { error: "You're not at this table." };
+    if (this.status !== "finished")
+      return { error: "This game isn't over yet." };
+    for (const seat of this.players.values()) {
+      seat.card = shuffled(this.board.terms);
+      seat.marks.clear();
+    }
+    this.winner = null;
+    this.startedAt = null;
+    this.status = "lobby";
     return { ok: true };
   }
 
@@ -109,6 +134,19 @@ export class GameRoom {
     this.chat.push(message);
     if (this.chat.length > CHAT_BACKLOG) this.chat.shift();
     return message;
+  }
+
+  toSummary(): GameSummary {
+    return {
+      code: this.code,
+      boardName: this.board.name,
+      size: this.board.size,
+      hostName: this.players.get(this.hostId)?.player.name ?? "a mystery host",
+      status: this.status === "finished" ? "playing" : this.status,
+      playerNames: [...this.players.values()].map((p) => p.player.name),
+      createdAt: this.createdAt,
+      startedAt: this.startedAt,
+    };
   }
 
   toState(): GameState {
@@ -213,6 +251,17 @@ export class GameManager {
   liveCount(): number {
     return [...this.games.values()].filter((g) => g.status !== "finished")
       .length;
+  }
+
+  /** Joinable tables (lobby + playing), newest first. */
+  list(): GameSummary[] {
+    return [...this.games.values()]
+      .filter(
+        (g): g is GameRoom & { status: "lobby" | "playing" } =>
+          g.status !== "finished",
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((g) => g.toSummary());
   }
 }
 
