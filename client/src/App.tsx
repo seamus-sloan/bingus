@@ -4,6 +4,7 @@ import { CreateBoardPage } from './pages/CreateBoardPage'
 import { EditBoardPage } from './pages/EditBoardPage'
 import { GameRoute } from './pages/GameRoute'
 import { HomePage } from './pages/HomePage'
+import { JoinGamesPage } from './pages/JoinGamesPage'
 import { SignInPage } from './pages/SignInPage'
 import { SessionProvider, useSession } from './lib/session'
 
@@ -20,6 +21,7 @@ function Screens() {
       <Route path="/boards" element={<BoardArchivePage />} />
       <Route path="/boards/new" element={<CreateBoardPage />} />
       <Route path="/boards/:id/edit" element={<EditBoardPage />} />
+      <Route path="/join" element={<JoinGamesPage />} />
       <Route path="/game/:code" element={<GameRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

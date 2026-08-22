@@ -153,15 +153,15 @@ describe('home screen', () => {
     ).toBeDefined()
   })
 
-  it('raises a coming-soon toast from the join CTA', async () => {
+  it('navigates to the live tables screen from the join CTA', async () => {
     mockApi({ me: { id: 'p1', name: 'Ruth' } })
     render(<App />)
     fireEvent.click(
       await screen.findByRole('button', { name: /See live tables/ }),
     )
-    expect((await screen.findByRole('status')).textContent).toContain(
-      'still at the printers',
-    )
+    expect(
+      await screen.findByRole('heading', { name: 'Live tables' }),
+    ).toBeDefined()
   })
 })
 

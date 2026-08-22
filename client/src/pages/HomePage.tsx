@@ -7,13 +7,11 @@ import { useSession } from '../lib/session'
 import styles from './HomePage.module.css'
 
 // Mockup 1b — start a new game or join one. The two CTAs lead to the board
-// picker (1c) and live tables (1e); until those screens exist they raise a
-// "coming soon" toast.
+// picker (1c) and live tables (1e).
 export function HomePage() {
   const { player } = useSession()
   const navigate = useNavigate()
   const [stats, setStats] = useState<StatsResponse | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -26,11 +24,6 @@ export function HomePage() {
       cancelled = true
     }
   }, [])
-
-  function comingSoon() {
-    setToast("That screen's still at the printers. Soon.")
-    window.setTimeout(() => setToast(null), 2500)
-  }
 
   const live = stats?.liveGames ?? 0
 
@@ -80,7 +73,7 @@ export function HomePage() {
             <button
               className={styles.joinCta}
               type="button"
-              onClick={comingSoon}
+              onClick={() => navigate('/join')}
             >
               See live tables →
             </button>
@@ -108,11 +101,6 @@ export function HomePage() {
           )}
         </div>
       </main>
-      {toast && (
-        <div className={styles.toast} role="status">
-          {toast}
-        </div>
-      )}
     </>
   )
 }
