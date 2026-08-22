@@ -28,7 +28,13 @@ function makeBoard(n: number, overrides: Partial<Board> = {}): Board {
 
 // Behave like the real /api/boards endpoint over an in-memory archive:
 // filter by ?search, then slice by ?offset/?limit.
-function mockApi(boards: Board[] = []) {
+function mockApi(
+  boards: Board[] = [],
+  {
+    deleteStatus = 200,
+    deleteBody = { ok: true },
+  }: { deleteStatus?: number; deleteBody?: unknown } = {},
+) {
   const fetchMock = vi.fn().mockImplementation(
     (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
@@ -39,6 +45,9 @@ function mockApi(boards: Board[] = []) {
       }
       if (url === '/api/games' && method === 'POST') {
         return Promise.resolve(jsonResponse(201, { code: 'BNGS-421' }))
+      }
+      if (/^\/api\/boards\/[^/?]+$/.test(url) && method === 'DELETE') {
+        return Promise.resolve(jsonResponse(deleteStatus, deleteBody))
       }
       if (url.startsWith('/api/boards') && method === 'GET') {
         const params = new URL(url, 'http://test').searchParams
@@ -208,22 +217,86 @@ describe('board archive', () => {
     ).toBeDefined()
   })
 
-  it('shows the edit button only on the signed-in player’s own boards', async () => {
+  it('shows the edit and delete icons only on the signed-in player’s own boards', async () => {
     mockApi([makeBoard(1), makeBoard(2, { createdBy: 'Ruth' })])
     renderArchive()
-    // /api/me resolves Ruth, so only board 2 is editable.
-    const edit = await screen.findByRole('button', { name: '✎ Edit' })
+    // /api/me resolves Ruth, so only board 2 carries the action icons.
+    const edit = await screen.findByRole('button', { name: 'Edit board' })
     expect(edit.closest('article')?.textContent).toContain('Board 2')
-    expect(screen.getAllByRole('button', { name: '✎ Edit' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Edit board' })).toHaveLength(1)
+    const del = screen.getByRole('button', { name: 'Delete board' })
+    expect(del.closest('article')?.textContent).toContain('Board 2')
   })
 
-  it('the edit button navigates to the board’s edit route', async () => {
+  it('the edit icon navigates to the board’s edit route', async () => {
     mockApi([makeBoard(3, { createdBy: 'Ruth' })])
     renderArchive()
-    fireEvent.click(await screen.findByRole('button', { name: '✎ Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit board' }))
     expect(
       await screen.findByRole('heading', { name: 'Edit route probe board-3' }),
     ).toBeDefined()
+  })
+
+  it('the trash icon opens a confirm naming the board', async () => {
+    mockApi([makeBoard(2, { createdBy: 'Ruth' })])
+    renderArchive()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete board' }))
+    expect(
+      screen.getByText('Delete “Board 2”? This can’t be undone.'),
+    ).toBeDefined()
+  })
+
+  it('“Keep it” closes the confirm without issuing a DELETE', async () => {
+    const fetchMock = mockApi([makeBoard(2, { createdBy: 'Ruth' })])
+    renderArchive()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete board' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+    expect(screen.queryByText(/This can’t be undone/)).toBeNull()
+    expect(screen.getByText('Board 2')).toBeDefined()
+    expect(
+      fetchMock.mock.calls.some(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'DELETE',
+      ),
+    ).toBe(false)
+  })
+
+  it('confirming the delete removes the card, fixes the count, and toasts', async () => {
+    const fetchMock = mockApi([
+      makeBoard(1),
+      makeBoard(2, { createdBy: 'Ruth' }),
+    ])
+    renderArchive()
+    expect(await screen.findByText('showing 2 of 2')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete board' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete it' }))
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Board shredded. 🗑',
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/boards/board-2',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    expect(screen.queryByText('Board 2')).toBeNull()
+    expect(screen.getByText('Board 1')).toBeDefined()
+    expect(screen.getByText('showing 1 of 1')).toBeDefined()
+  })
+
+  it('a failed delete surfaces the ApiError in the toast and keeps the card', async () => {
+    mockApi([makeBoard(2, { createdBy: 'Ruth' })], {
+      deleteStatus: 403,
+      deleteBody: {
+        code: 'unauthorized',
+        error: 'Only the creator can shred this board.',
+      },
+    })
+    renderArchive()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete board' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete it' }))
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Only the creator can shred this board.',
+    )
+    expect(screen.getByText('Board 2')).toBeDefined()
+    expect(screen.getByText('showing 1 of 1')).toBeDefined()
   })
 
   it('shows the printed toast when arriving from board creation', async () => {

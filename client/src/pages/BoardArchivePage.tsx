@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import type { Board } from '@bingus/shared'
 import { AppHeader } from '../components/AppHeader'
-import { createGame, listBoards } from '../lib/api'
+import { ApiError, createGame, deleteBoard, listBoards } from '../lib/api'
 import { useSession } from '../lib/session'
 import styles from './BoardArchivePage.module.css'
 
@@ -73,19 +73,53 @@ function BoardArchiveCard({
   board,
   isNew,
   isMine,
+  confirmingDelete,
   onPlay,
   onEdit,
+  onDeleteAsk,
+  onDeleteConfirm,
+  onDeleteCancel,
 }: {
   board: Board
   isNew: boolean
   isMine: boolean
+  confirmingDelete: boolean
   onPlay: () => void
   onEdit: () => void
+  onDeleteAsk: () => void
+  onDeleteConfirm: () => void
+  onDeleteCancel: () => void
 }) {
   const accent = CANDY[hashId(board.id) % CANDY.length]
   return (
     <article className={styles.card}>
-      {isNew && <span className={styles.newRibbon}>NEW</span>}
+      {/* The action icons live in the upper-right, so a card that is both
+          new and yours hangs its NEW ribbon on the left instead. */}
+      {isNew && (
+        <span className={isMine ? styles.newRibbonLeft : styles.newRibbon}>
+          NEW
+        </span>
+      )}
+      {isMine && (
+        <div className={styles.cardActions}>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Edit board"
+            onClick={onEdit}
+          >
+            ✎
+          </button>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Delete board"
+            onClick={onDeleteAsk}
+          >
+            🗑
+          </button>
+        </div>
+      )}
       <BoardArchivePreview board={board} />
       <h3 className={styles.cardName}>{board.name}</h3>
       <p className={styles.cardBy}>
@@ -100,15 +134,33 @@ function BoardArchiveCard({
             ? 'fresh off the press'
             : `${board.plays} play${board.plays === 1 ? '' : 's'}`}
         </span>
-        {isMine && (
-          <button className={styles.editChip} type="button" onClick={onEdit}>
-            ✎ Edit
-          </button>
-        )}
       </div>
       <button className={styles.playCta} type="button" onClick={onPlay}>
         Play this board →
       </button>
+      {confirmingDelete && (
+        <div className={styles.confirmOverlay} data-delete-confirm>
+          <p className={styles.confirmText}>
+            Delete “{board.name}”? This can’t be undone.
+          </p>
+          <div className={styles.confirmButtons}>
+            <button
+              className={styles.confirmDelete}
+              type="button"
+              onClick={onDeleteConfirm}
+            >
+              Delete it
+            </button>
+            <button
+              className={styles.confirmKeep}
+              type="button"
+              onClick={onDeleteCancel}
+            >
+              Keep it
+            </button>
+          </div>
+        </div>
+      )}
     </article>
   )
 }
@@ -124,6 +176,10 @@ export function BoardArchivePage() {
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
+  // Board id whose delete confirmation is open — one at a time, page-wide.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
+    null,
+  )
   const [toast, setToast] = useState<string | null>(null)
   const [printedToast, setPrintedToast] = useState<string | null>(
     (location.state as { printed?: string } | null)?.printed ?? null,
@@ -183,12 +239,57 @@ export function BoardArchivePage() {
       .finally(() => setLoadingMore(false))
   }
 
+  // Escape or a press outside the confirm panel cancels a pending delete.
+  // mousedown (not click) so the press that opens another card's confirm
+  // isn't swallowed by the close.
+  useEffect(() => {
+    if (!confirmingDeleteId) return
+    function onMouseDown(e: MouseEvent) {
+      const target = e.target as Element | null
+      if (!target?.closest?.('[data-delete-confirm]')) {
+        setConfirmingDeleteId(null)
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setConfirmingDeleteId(null)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [confirmingDeleteId])
+
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2500)
+  }
+
+  function shredBoard(board: Board) {
+    deleteBoard(board.id)
+      .then(() => {
+        setConfirmingDeleteId(null)
+        setBoards((prev) => prev.filter((b) => b.id !== board.id))
+        setTotal((prev) => (prev === null ? prev : prev - 1))
+        setArchiveTotal((prev) => (prev === null ? prev : prev - 1))
+        showToast('Board shredded. 🗑')
+      })
+      .catch((err) => {
+        setConfirmingDeleteId(null)
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : "Couldn't shred the board. Try again in a second.",
+        )
+      })
+  }
+
   function playBoard(boardId: string) {
     createGame(boardId)
       .then(({ code }) => navigate(`/game/${code}`))
       .catch(() => {
-        setToast("Couldn't open a table. Try again in a second.")
-        window.setTimeout(() => setToast(null), 2500)
+        showToast("Couldn't open a table. Try again in a second.")
       })
   }
 
@@ -241,8 +342,12 @@ export function BoardArchivePage() {
               board={board}
               isNew={fresh.has(board.id)}
               isMine={board.createdBy === player?.name}
+              confirmingDelete={confirmingDeleteId === board.id}
               onPlay={() => playBoard(board.id)}
               onEdit={() => navigate(`/boards/${board.id}/edit`)}
+              onDeleteAsk={() => setConfirmingDeleteId(board.id)}
+              onDeleteConfirm={() => shredBoard(board)}
+              onDeleteCancel={() => setConfirmingDeleteId(null)}
             />
           ))}
           {emptyArchive && (
