@@ -43,12 +43,15 @@ export function attachSocket(
     next();
   });
 
-  io.on("connection", (socket) => {
-    const broadcast = (code: string) => {
-      const room = deps.games.get(code);
-      if (room) io.to(code).emit("game:state", room.toState());
-    };
+  const broadcast = (code: string) => {
+    const room = deps.games.get(code);
+    if (room) io.to(code).emit("game:state", room.toState());
+  };
 
+  // REST-side room changes (profile renames) broadcast through here too.
+  deps.games.onRoomChanged = broadcast;
+
+  io.on("connection", (socket) => {
     const leaveCurrent = () => {
       const code = socket.data.gameCode;
       if (!code) return;

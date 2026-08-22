@@ -60,6 +60,14 @@ export class GameRoom {
     if (p) p.connected = false;
   }
 
+  /** Refresh a seated player's name (profile renames mid-game). */
+  renamePlayer(playerId: string, name: string): boolean {
+    const p = this.players.get(playerId);
+    if (!p) return false;
+    p.player = { ...p.player, name };
+    return true;
+  }
+
   get empty(): boolean {
     return [...this.players.values()].every((p) => !p.connected);
   }
@@ -165,6 +173,19 @@ export class GameRoom {
 
 export class GameManager {
   private games = new Map<string, GameRoom>();
+
+  /** Set by the socket layer so out-of-band room changes (e.g. renames via
+   * REST) still reach everyone at the table. */
+  onRoomChanged: ((code: string) => void) | null = null;
+
+  /** Propagate a profile rename into every room the player is seated at. */
+  renamePlayer(playerId: string, name: string): void {
+    for (const room of this.games.values()) {
+      if (room.renamePlayer(playerId, name)) {
+        this.onRoomChanged?.(room.code);
+      }
+    }
+  }
 
   /** Open a table for a board. Returns the join code. */
   create(board: Board, host: Player): GameRoom {

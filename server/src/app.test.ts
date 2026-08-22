@@ -160,6 +160,20 @@ describe("games", () => {
     });
     expect(badBoard.status).toBe(404);
   });
+
+  it("propagates a profile rename into live game seats", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    const res = await app.request("/api/games", {
+      method: "POST",
+      headers: { Cookie: cookie },
+      body: JSON.stringify({ boardId: created.body.board.id }),
+    });
+    const { code } = (await res.json()) as { code: string };
+    await rename(cookie, "TileSlayer");
+    const seat = games.get(code)!.toState().players[0]!;
+    expect(seat.player.name).toBe("TileSlayer");
+  });
 });
 
 describe("boards", () => {

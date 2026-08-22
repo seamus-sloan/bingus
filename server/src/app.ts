@@ -164,6 +164,8 @@ export function createApp(
     }
     const result = players.rename(me.player.id, body.data.name);
     if (result === "name_taken") return c.json(nameTaken(body.data.name), 409);
+    // Game rooms hold player snapshots — push the new name to every seat.
+    games.renamePlayer(me.player.id, result.name);
     return c.json({ player: result } satisfies MeResponse);
   });
 

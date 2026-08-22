@@ -153,4 +153,23 @@ describe("GameManager", () => {
     expect(m.get(r.code)).toBeUndefined();
     expect(m.liveCount()).toBe(0);
   });
+
+  it("propagates renames into every seated room and notifies each", () => {
+    const m = new GameManager();
+    const a = m.create(board(), HOST);
+    const b = m.create(board(), RIVAL);
+    b.join(HOST);
+    const other = m.create(board(), RIVAL); // HOST not seated here
+    const notified: string[] = [];
+    m.onRoomChanged = (code) => notified.push(code);
+    m.renamePlayer(HOST.id, "TileSlayer");
+    for (const room of [a, b]) {
+      const seat = room
+        .toState()
+        .players.find((p) => p.player.id === HOST.id)!;
+      expect(seat.player.name).toBe("TileSlayer");
+    }
+    expect(notified.sort()).toEqual([a.code, b.code].sort());
+    expect(notified).not.toContain(other.code);
+  });
 });
