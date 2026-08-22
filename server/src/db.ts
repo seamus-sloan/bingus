@@ -165,7 +165,7 @@ export class BoardsRepo {
     ).n;
     const rows = this.db
       .prepare(
-        `${BOARD_SELECT} ${filter} ORDER BY b.created_at DESC, b.id LIMIT ? OFFSET ?`,
+        `${BOARD_SELECT} ${filter} ORDER BY b.created_at DESC, b.rowid DESC LIMIT ? OFFSET ?`,
       )
       .all(...params, query.limit, query.offset) as unknown as BoardRow[];
     return { boards: rows.map(rowToBoard), total };
