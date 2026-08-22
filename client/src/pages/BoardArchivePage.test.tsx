@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Board } from '@bingus/shared'
 import { SessionProvider } from '../lib/session'
@@ -64,6 +64,11 @@ function mockApi(boards: Board[] = []) {
   return fetchMock
 }
 
+function EditProbe() {
+  const { id } = useParams()
+  return <h2>Edit route probe {id}</h2>
+}
+
 function renderArchive(initialEntry: string | { pathname: string; state?: unknown } = '/boards') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -71,6 +76,7 @@ function renderArchive(initialEntry: string | { pathname: string; state?: unknow
         <Routes>
           <Route path="/boards" element={<BoardArchivePage />} />
           <Route path="/boards/new" element={<h2>Print a fresh board</h2>} />
+          <Route path="/boards/:id/edit" element={<EditProbe />} />
           <Route path="/game/:code" element={<h2>Game route probe</h2>} />
         </Routes>
       </SessionProvider>
@@ -91,7 +97,7 @@ describe('board archive', () => {
     ])
     renderArchive()
     expect(await screen.findByText('Board 1')).toBeDefined()
-    expect(screen.getByText('by author1')).toBeDefined()
+    expect(screen.getByText('by author1 (Aug. 1, 2026)')).toBeDefined()
     expect(screen.getByText('41 plays')).toBeDefined()
     expect(screen.getByText('Board 2')).toBeDefined()
     expect(screen.getByText('fresh off the press')).toBeDefined()
@@ -192,6 +198,32 @@ describe('board archive', () => {
       '/api/games',
       expect.objectContaining({ method: 'POST' }),
     )
+  })
+
+  it('renders a May created date without a period', async () => {
+    mockApi([makeBoard(1, { createdAt: '2026-05-12T00:00:00.000Z' })])
+    renderArchive()
+    expect(
+      await screen.findByText('by author1 (May 12, 2026)'),
+    ).toBeDefined()
+  })
+
+  it('shows the edit button only on the signed-in player’s own boards', async () => {
+    mockApi([makeBoard(1), makeBoard(2, { createdBy: 'Ruth' })])
+    renderArchive()
+    // /api/me resolves Ruth, so only board 2 is editable.
+    const edit = await screen.findByRole('button', { name: '✎ Edit' })
+    expect(edit.closest('article')?.textContent).toContain('Board 2')
+    expect(screen.getAllByRole('button', { name: '✎ Edit' })).toHaveLength(1)
+  })
+
+  it('the edit button navigates to the board’s edit route', async () => {
+    mockApi([makeBoard(3, { createdBy: 'Ruth' })])
+    renderArchive()
+    fireEvent.click(await screen.findByRole('button', { name: '✎ Edit' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Edit route probe board-3' }),
+    ).toBeDefined()
   })
 
   it('shows the printed toast when arriving from board creation', async () => {

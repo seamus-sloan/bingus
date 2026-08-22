@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 import type { Board } from '@bingus/shared'
 import { AppHeader } from '../components/AppHeader'
 import { createGame, listBoards } from '../lib/api'
+import { useSession } from '../lib/session'
 import styles from './BoardArchivePage.module.css'
 
 // Mockup 1c — pick a board from the archive (step 1 of starting a game).
@@ -18,6 +19,22 @@ const PRINTED_TOAST_MS = 3000
 // and which preview tiles are "filled" — derives from its id, so a board
 // always looks the same without storing any styling server-side.
 const CANDY = ['#FFD43B', '#A3E635', '#FF8FC1', '#7DD3FC', '#C89BF5', '#FFA94D']
+
+// "Aug. 12, 2026" — en-US short month + day + year, with a period after
+// abbreviated months but not after May (which isn't an abbreviation). UTC,
+// so a board's date reads the same everywhere.
+const boardDateFormat = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
+function formatBoardDate(iso: string): string {
+  return boardDateFormat
+    .format(new Date(iso))
+    .replace(/^(\w+)/, (month) => (month === 'May' ? month : `${month}.`))
+}
 
 function hashId(id: string): number {
   let h = 0
@@ -55,11 +72,15 @@ function freshIds(boards: Board[]): string[] {
 function BoardArchiveCard({
   board,
   isNew,
+  isMine,
   onPlay,
+  onEdit,
 }: {
   board: Board
   isNew: boolean
+  isMine: boolean
   onPlay: () => void
+  onEdit: () => void
 }) {
   const accent = CANDY[hashId(board.id) % CANDY.length]
   return (
@@ -67,7 +88,9 @@ function BoardArchiveCard({
       {isNew && <span className={styles.newRibbon}>NEW</span>}
       <BoardArchivePreview board={board} />
       <h3 className={styles.cardName}>{board.name}</h3>
-      <p className={styles.cardBy}>by {board.createdBy}</p>
+      <p className={styles.cardBy}>
+        by {board.createdBy} ({formatBoardDate(board.createdAt)})
+      </p>
       <div className={styles.chips}>
         <span className={styles.sizeChip} style={{ background: accent }}>
           {board.size}×{board.size}
@@ -77,6 +100,11 @@ function BoardArchiveCard({
             ? 'fresh off the press'
             : `${board.plays} play${board.plays === 1 ? '' : 's'}`}
         </span>
+        {isMine && (
+          <button className={styles.editChip} type="button" onClick={onEdit}>
+            ✎ Edit
+          </button>
+        )}
       </div>
       <button className={styles.playCta} type="button" onClick={onPlay}>
         Play this board →
@@ -88,6 +116,7 @@ function BoardArchiveCard({
 export function BoardArchivePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { player } = useSession()
   const [boards, setBoards] = useState<Board[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [archiveTotal, setArchiveTotal] = useState<number | null>(null)
@@ -211,7 +240,9 @@ export function BoardArchivePage() {
               key={board.id}
               board={board}
               isNew={fresh.has(board.id)}
+              isMine={board.createdBy === player?.name}
               onPlay={() => playBoard(board.id)}
+              onEdit={() => navigate(`/boards/${board.id}/edit`)}
             />
           ))}
           {emptyArchive && (

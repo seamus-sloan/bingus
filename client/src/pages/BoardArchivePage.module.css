@@ -196,6 +196,25 @@
   color: var(--muted);
 }
 
+.editChip {
+  padding: 4px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.editChip:hover {
+  background: var(--yellow);
+}
+
+.editChip:active {
+  translate: 1px 1px;
+}
+
 .playCta {
   display: inline-flex;
   align-items: center;
