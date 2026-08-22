@@ -17,6 +17,7 @@ npm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on
 
 ## Non-negotiable conventions
 
+- **One definition per type, and it lives in `@bingus/shared`.** Any domain type used by more than one package — or by both code and tests — is defined once in `shared/` and imported everywhere (`client/`, `server/`, and all `*.test.ts(x)` files). Never redeclare a shape locally, never hand-write a "test copy" of a type, never let a frontend and backend version of the same concept drift apart. Prefer deriving types from Zod schemas (`z.infer`) so runtime validation and static types share a single source.
 - **All wire messages are defined in `shared/src/protocol.ts`** — Zod schema + entry in `ClientToServerEvents` / `ServerToClientEvents`. Never define an event name or payload shape inline in client or server code. Protocol first, then both ends.
 - **Server validates every inbound payload** with its Zod schema before acting. Never trust client data.
 - **The server is authoritative** for game outcomes: shuffles are generated server-side, wins are validated server-side. Clients render and report intents.

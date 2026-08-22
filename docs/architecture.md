@@ -25,7 +25,9 @@ Everything live goes over a single **Socket.IO** connection: lobby presence, til
 
 Socket.IO was chosen over raw `ws` for its rooms (one room per game), automatic reconnection with buffered events (a sleeping laptop shouldn't eject a player mid-game), and acknowledgment callbacks (request/response semantics for actions like marking a tile).
 
-### The shared protocol package
+### The shared package: one source of truth for types
+
+`@bingus/shared` is the single home for every type the packages have in common. Domain types (players, boards, games) are defined once here and imported by the client, the server, **and tests** — no package redeclares a shape locally, and there is never a frontend copy and a backend copy of the same concept. Types are derived from Zod schemas (`z.infer`) wherever a value crosses a trust boundary, so runtime validation and static types cannot drift apart.
 
 **Every message that crosses the wire is defined in [shared/src/protocol.ts](../shared/src/protocol.ts)** — Zod schemas for payloads plus the `ClientToServerEvents` / `ServerToClientEvents` interfaces that parameterize Socket.IO on both sides. Neither client nor server may invent an event or payload shape locally:
 
