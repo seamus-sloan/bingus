@@ -1,0 +1,19 @@
+.main {
+  padding: 56px 72px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 58px;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 12px 0 0;
+}

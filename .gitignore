@@ -25,3 +25,6 @@ coverage/
 !.vscode/extensions.json
 .idea/
 .DS_Store
+
+# SQLite database files
+server/data/

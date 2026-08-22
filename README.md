@@ -7,7 +7,7 @@ Players sign in with just a name, pick a bingo board from the archive (or print 
 ## Stack
 
 - **Client** — React 19 + TypeScript, built with Vite
-- **Server** — Hono (REST) + Socket.IO (realtime) on Node
+- **Server** — Hono (REST) + Socket.IO (realtime) on Node, SQLite for persistence
 - **Shared** — Zod-validated wire protocol used by both sides
 
 See [docs/architecture.md](docs/architecture.md) for how the pieces talk to each other.

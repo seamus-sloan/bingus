@@ -14,7 +14,13 @@ There are exactly two channels, both terminating at the same Node process:
 
 ### 1. REST — request/response data
 
-Everything that is not live game traffic goes over plain HTTP under `/api/*`, served by **Hono** ([server/src/app.ts](../server/src/app.ts)). This covers the board archive (list, search, create), health checks, and any other CRUD.
+Everything that is not live game traffic goes over plain HTTP under `/api/*`, served by **Hono** ([server/src/app.ts](../server/src/app.ts)). This covers players, the board archive (list, search, create), health checks, and any other CRUD.
+
+Current endpoints:
+
+- `GET /api/health` — liveness probe.
+- `POST /api/players` — sign in by claiming a unique name (case-insensitive). Returns the `Player` plus a `token`; `409 name_taken` on collision.
+- `PATCH /api/players/:id` — rename. Requires `Authorization: Bearer <token>` from the create response; same `409 name_taken` on collision.
 
 - In **dev**, the client calls same-origin paths (`fetch('/api/...')`) and the Vite dev server proxies them to `http://localhost:3000` (see [client/vite.config.ts](../client/vite.config.ts)). No CORS anywhere.
 - In **prod**, the client build is static and is expected to be served from the same origin as the server, so the same same-origin calls work unchanged.
@@ -40,7 +46,13 @@ Adding a feature that needs a new message = add the schema + event signature to 
 
 The server is the referee. Board shuffles are generated server-side per player (so cards can't be re-rolled and rivals' boards render consistently), and win claims are validated server-side against the marked set (row / column / diagonal / blackout). Clients render state and report intents; they never decide outcomes.
 
-Active game state lives in memory on the single server process. Persistence (board archive, finished-game stats) will live in SQLite — not yet wired up.
+Active game state lives in memory on the single server process. Persistence lives in SQLite.
+
+## Persistence & identity
+
+- **SQLite via `node:sqlite`** (Node's built-in driver — still flagged experimental upstream, but the surface we use is tiny and isolated in [server/src/db.ts](../server/src/db.ts); swap the driver there if it ever shifts). The database file defaults to `server/data/bingus.db` (gitignored) and is overridable with `BINGUS_DB`; tests use `:memory:`.
+- **Players** are the identity model: no accounts, just a globally unique name (enforced `UNIQUE COLLATE NOCASE` in the DB — uniqueness lives in the schema, not application code). Creating a player returns a bearer `token` that authorizes profile changes.
+- **The client session** (`player` + `token`) is kept in localStorage by [client/src/lib/session.tsx](../client/src/lib/session.tsx). No session = sign-in screen; the header's profile chip edits the name via the PATCH endpoint.
 
 ## Dev workflow
 

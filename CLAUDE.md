@@ -13,7 +13,7 @@ Multiplayer bingo web app: name-only sign-in, board archive + board creator, liv
 
 ## Layout
 
-npm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on Node, run via tsx), `shared/` (`@bingus/shared` — the wire protocol).
+npm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on Node, run via tsx; SQLite via node:sqlite in `server/data/`), `shared/` (`@bingus/shared` — the wire protocol).
 
 ## Non-negotiable conventions
 

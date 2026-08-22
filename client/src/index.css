@@ -1,9 +1,56 @@
 :root {
-  font-family: system-ui, sans-serif;
-  color: #2b1b33;
-  background: #fff4e6;
+  /* "sticker-pop" design tokens — see docs/architecture.md */
+  --ink: #2b1b33;
+  --cream: #fff4e6;
+  --paper: #fffdf8;
+  --muted: #6e5a7a;
+  --faint: #8a7a93;
+  --pink: #ff3d8f;
+  --magenta: #e11d74;
+  --yellow: #ffd43b;
+  --lime: #a3e635;
+  --grad: linear-gradient(135deg, #ff8a00, #ff3d8f);
+
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-body: 'Onest', system-ui, sans-serif;
+
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--cream);
 }
 
 body {
   margin: 0;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+input,
+textarea {
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+@keyframes dfloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-16px) rotate(var(--r, 0deg));
+  }
+}
+
+@keyframes dpulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.45);
+    opacity: 0.55;
+  }
 }
