@@ -19,10 +19,12 @@ Everything that is not live game traffic goes over plain HTTP under `/api/*`, se
 Current endpoints:
 
 - `GET /api/health` — liveness probe.
-- `GET /api/stats` — Home-screen numbers (player count is live; boards/liveGames stay 0 until those features exist).
+- `GET /api/stats` — Home-screen numbers (player and board counts are live; liveGames stays 0 until game tables exist).
 - `POST /api/players` — sign in by claiming a unique name (case-insensitive). Sets the httpOnly session cookie and returns the `Player`; `409 name_taken` on collision.
 - `GET /api/me` — resolve the session cookie to a player. `401 unauthorized` when the cookie is missing or the player no longer exists (ghost session).
 - `PATCH /api/me` — rename the signed-in player; same `409 name_taken` on collision.
+- `GET /api/boards?search=&limit=&offset=` — browse the board archive, newest first; `search` filters by name (case-insensitive), `limit` caps at 50.
+- `POST /api/boards` — print a fresh board (session required). Validates term count (`size² - 1`, center tile is FREE) and term uniqueness via the shared schema; `400 invalid_board` with a message on failure.
 
 - In **dev**, the client calls same-origin paths (`fetch('/api/...')`) and the Vite dev server proxies them to `http://localhost:3000` (see [client/vite.config.ts](../client/vite.config.ts)). No CORS anywhere.
 - In **prod**, the client build is static and is expected to be served from the same origin as the server, so the same same-origin calls work unchanged.
@@ -63,6 +65,7 @@ Active game state lives in memory on the single server process. Persistence live
 - `pnpm run dev` (root) runs both watchers via `pnpm -r --parallel`: `tsx watch` for the server (port 3000), Vite for the client (port 5173).
 - The server runs TypeScript directly via **tsx** — its `build` script is a typecheck (`tsc --noEmit`), and prod runs `pnpm --filter @bingus/server start`. If a bundled artifact becomes worthwhile, revisit then.
 - Lint is **oxlint**, configured once at the repo root ([.oxlintrc.json](../.oxlintrc.json)).
+- The client routes with **react-router** (`/` home, `/boards` archive, `/boards/new` creator). All authenticated routes render inside the signed-in branch of `App.tsx` — the session gate wraps the router, so no screen but sign-in is reachable without a server-confirmed player.
 - Tests are **vitest** per workspace (`pnpm test` at the root fans out): jsdom environment in the client, Node in server/shared.
 
 ## CI
