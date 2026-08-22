@@ -122,6 +122,36 @@ describe("board editing", () => {
     expect(((await res.json()) as ApiError).code).toBe("unauthorized");
   });
 
+  it("lets the creator delete their board", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    const res = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "DELETE",
+      headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const list = await listBoards();
+    expect(list.body.total).toBe(0);
+    const gone = await app.request(`/api/boards/${created.body.board.id}`);
+    expect(gone.status).toBe(404);
+  });
+
+  it("refuses deletion from anyone but the creator", async () => {
+    const ruth = await signIn("Ruth");
+    const created = await createBoard(ruth.cookie);
+    const priya = await signIn("Priya");
+    const res = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "DELETE",
+      headers: { Cookie: priya.cookie },
+    });
+    expect(res.status).toBe(403);
+    const noAuth = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "DELETE",
+    });
+    expect(noAuth.status).toBe(401);
+  });
+
   it("404s for an unknown board", async () => {
     const res = await app.request("/api/boards/nope");
     expect(res.status).toBe(404);

@@ -11,6 +11,7 @@ import {
   type CreateBoardResponse,
   type CreateGameResponse,
   type CreatePlayerResponse,
+  type DeleteBoardResponse,
   type GetBoardResponse,
   type ListBoardsResponse,
   type ListGamesResponse,
@@ -116,6 +117,24 @@ export function createApp(
     }
     const board = boards.update(found.board.id, body.data);
     return c.json({ board } satisfies GetBoardResponse);
+  });
+
+  app.delete("/api/boards/:id", (c) => {
+    const me = currentPlayer(c);
+    if (!me) return c.json(unauthorized(), 401);
+    const found = boards.get(c.req.param("id"));
+    if (!found) return c.json(boardNotFound(), 404);
+    if (found.createdById !== me.player.id) {
+      return c.json(
+        {
+          code: "unauthorized",
+          error: "Only the board's creator can delete it.",
+        } satisfies ApiError,
+        403,
+      );
+    }
+    boards.delete(found.board.id);
+    return c.json({ ok: true } satisfies DeleteBoardResponse);
   });
 
   app.post("/api/games", async (c) => {

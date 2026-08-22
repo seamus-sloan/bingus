@@ -164,6 +164,33 @@ describe("GameRoom", () => {
     expect(r.rematch(HOST.id)).toHaveProperty("error");
   });
 
+  it("promotes the longest-seated connected player when the host leaves", () => {
+    const r = room();
+    r.join(RIVAL);
+    r.join({ id: "third", name: "Dana" });
+    r.disconnect(HOST.id);
+    let state = r.toState();
+    expect(state.players.find((p) => p.isHost)?.player.name).toBe("Priya");
+    // New host can start; the old host cannot.
+    expect(r.start(HOST.id)).toHaveProperty("error");
+    expect(r.start(RIVAL.id)).toEqual({ ok: true });
+    // Succession also applies mid-game.
+    r.disconnect(RIVAL.id);
+    state = r.toState();
+    expect(state.players.find((p) => p.isHost)?.player.name).toBe("Dana");
+    expect(r.toSummary().hostName).toBe("Dana");
+  });
+
+  it("returning ex-hosts do not reclaim the crown", () => {
+    const r = room();
+    r.join(RIVAL);
+    r.disconnect(HOST.id);
+    r.join(HOST);
+    expect(
+      r.toState().players.find((p) => p.isHost)?.player.name,
+    ).toBe("Priya");
+  });
+
   it("caps the chat backlog", () => {
     const r = room();
     for (let i = 0; i < 120; i++) r.addChat(HOST, `msg ${i}`);
@@ -202,6 +229,28 @@ describe("GameManager", () => {
     expect(summary.status).toBe("lobby");
     expect(summary.startedAt).toBeNull();
     expect(summary.boardName).toBe("Standup Standoff");
+  });
+
+  it("dismisses a lobby everyone walked out of", () => {
+    const m = new GameManager();
+    const r = m.create(board(), HOST);
+    r.join(RIVAL);
+    r.disconnect(HOST.id);
+    m.sweep(r.code);
+    expect(m.get(r.code)).toBe(r); // Priya is still seated
+    r.disconnect(RIVAL.id);
+    m.sweep(r.code);
+    expect(m.get(r.code)).toBeUndefined();
+    expect(m.liveCount()).toBe(0);
+  });
+
+  it("keeps an emptied mid-game room joinable", () => {
+    const m = new GameManager();
+    const r = m.create(board(), HOST);
+    r.start(HOST.id);
+    r.disconnect(HOST.id);
+    m.sweep(r.code);
+    expect(m.get(r.code)).toBe(r);
   });
 
   it("sweeps only finished, empty rooms", () => {

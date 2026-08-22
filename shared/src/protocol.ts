@@ -26,6 +26,7 @@ export type Player = z.infer<typeof PlayerSchema>;
 // POST /api/boards — print a fresh board (requires a session).
 // GET  /api/boards/:id — fetch one board.
 // PATCH /api/boards/:id — edit a board you created (same shape as create).
+// DELETE /api/boards/:id — permanently delete a board you created.
 
 export const BOARD_SIZES = [3, 4, 5] as const;
 export const BoardSizeSchema = z.union([
@@ -104,6 +105,9 @@ export type UpdateBoardRequest = CreateBoardRequest;
 
 export const GetBoardResponseSchema = z.object({ board: BoardSchema });
 export type GetBoardResponse = z.infer<typeof GetBoardResponseSchema>;
+
+export const DeleteBoardResponseSchema = z.object({ ok: z.literal(true) });
+export type DeleteBoardResponse = z.infer<typeof DeleteBoardResponseSchema>;
 
 // --- Games ----------------------------------------------------------------
 // A game is a live table for one board. It lives in server memory: created

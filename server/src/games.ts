@@ -21,7 +21,6 @@ interface PlayerState {
   card: string[]; // board terms in this player's order (FREE tile omitted)
   marks: Set<number>;
   connected: boolean;
-  isHost: boolean;
 }
 
 export type MarkResult =
@@ -34,13 +33,22 @@ export class GameRoom {
   chat: ChatMessage[] = [];
   readonly createdAt = new Date().toISOString();
   startedAt: string | null = null;
+  // Insertion order doubles as seniority — host succession picks the
+  // longest-seated connected player.
   private players = new Map<string, PlayerState>();
+  private currentHostId: string;
 
   constructor(
     readonly code: string,
     readonly board: Board,
-    readonly hostId: string,
-  ) {}
+    hostId: string,
+  ) {
+    this.currentHostId = hostId;
+  }
+
+  get hostId(): string {
+    return this.currentHostId;
+  }
 
   /** Add (or reconnect) a player. New players get a freshly shuffled card. */
   join(player: Player): { ok: true } | { error: string } {
@@ -58,14 +66,25 @@ export class GameRoom {
       card: shuffled(this.board.terms),
       marks: new Set(),
       connected: true,
-      isHost: player.id === this.hostId,
     });
     return { ok: true };
   }
 
+  /** A departing host hands the room to the longest-seated connected player. */
   disconnect(playerId: string): void {
     const p = this.players.get(playerId);
-    if (p) p.connected = false;
+    if (!p) return;
+    p.connected = false;
+    if (playerId === this.currentHostId) {
+      const heir = [...this.players.values()].find((seat) => seat.connected);
+      if (heir) this.currentHostId = heir.player.id;
+    }
+  }
+
+  /** A lobby everyone walked out of is dismissed rather than left haunting
+   * the live-tables list. */
+  get abandoned(): boolean {
+    return this.status === "lobby" && this.empty;
   }
 
   /** Refresh a seated player's name (profile renames mid-game). */
@@ -164,7 +183,7 @@ export class GameRoom {
           card: p.card,
           marks: [...p.marks].sort((a, b) => a - b),
           connected: p.connected,
-          isHost: p.isHost,
+          isHost: p.player.id === this.currentHostId,
         }),
       ),
       winner: this.winner,
@@ -241,11 +260,13 @@ export class GameManager {
     return this.games.get(code.toUpperCase());
   }
 
-  /** Drop a room nobody can come back to (finished and fully disconnected). */
+  /** Drop rooms nobody will return to: finished and fully disconnected,
+   * or a lobby everyone abandoned. */
   sweep(code: string): void {
     const room = this.games.get(code);
-    if (room && room.status === "finished" && room.empty)
-      this.games.delete(code);
+    if (!room) return;
+    const done = room.status === "finished" && room.empty;
+    if (done || room.abandoned) this.games.delete(code);
   }
 
   liveCount(): number {

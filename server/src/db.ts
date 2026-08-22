@@ -192,6 +192,10 @@ export class BoardsRepo {
     return rowToBoard(row);
   }
 
+  delete(id: string): void {
+    this.db.prepare("DELETE FROM boards WHERE id = ?").run(id);
+  }
+
   incrementPlays(id: string): void {
     this.db.prepare("UPDATE boards SET plays = plays + 1 WHERE id = ?").run(id);
   }

@@ -2,6 +2,7 @@ import {
   ApiErrorSchema,
   CreateBoardResponseSchema,
   CreateGameResponseSchema,
+  DeleteBoardResponseSchema,
   CreatePlayerResponseSchema,
   GetBoardResponseSchema,
   ListBoardsResponseSchema,
@@ -12,6 +13,7 @@ import {
   type CreateBoardResponse,
   type CreateGameRequest,
   type CreateGameResponse,
+  type DeleteBoardResponse,
   type CreatePlayerRequest,
   type CreatePlayerResponse,
   type GetBoardResponse,
@@ -98,6 +100,12 @@ export function updateBoard(
 
 export function listGames(): Promise<ListGamesResponse> {
   return request('/api/games', {}, (data) => ListGamesResponseSchema.parse(data))
+}
+
+export function deleteBoard(id: string): Promise<DeleteBoardResponse> {
+  return request(`/api/boards/${id}`, { method: 'DELETE' }, (data) =>
+    DeleteBoardResponseSchema.parse(data),
+  )
 }
 
 // Open a live table for a board; the caller navigates to /game/:code.
