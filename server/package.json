@@ -10,7 +10,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@bingus/shared": "*",
+    "@bingus/shared": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "hono": "^4.13.3",
     "socket.io": "^4.8.3"

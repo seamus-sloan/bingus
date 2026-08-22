@@ -15,8 +15,8 @@ See [docs/architecture.md](docs/architecture.md) for how the pieces talk to each
 ## Getting started
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 This starts the server on `http://localhost:3000` and the Vite dev server on `http://localhost:5173` (which proxies `/api` and `/socket.io` to the server). Open `http://localhost:5173`.
@@ -27,10 +27,10 @@ All run from the repo root:
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Run server + client together with live reload |
-| `npm run lint` | Lint the whole repo with oxlint |
-| `npm test` | Run vitest suites in every workspace |
-| `npm run build` | Build the client, typecheck server + shared |
+| `pnpm run dev` | Run server + client together with live reload |
+| `pnpm run lint` | Lint the whole repo with oxlint |
+| `pnpm test` | Run vitest suites in every workspace |
+| `pnpm run build` | Build the client, typecheck server + shared |
 
 ## Layout
 

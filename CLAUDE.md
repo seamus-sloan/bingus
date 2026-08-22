@@ -6,14 +6,14 @@ Multiplayer bingo web app: name-only sign-in, board archive + board creator, liv
 
 ## Commands (run from repo root)
 
-- `npm run dev` — server (:3000) + client (:5173) with live reload
-- `npm run lint` — oxlint over the whole repo
-- `npm test` — vitest in every workspace
-- `npm run build` — client build + server/shared typecheck
+- `pnpm run dev` — server (:3000) + client (:5173) with live reload
+- `pnpm run lint` — oxlint over the whole repo
+- `pnpm test` — vitest in every workspace
+- `pnpm run build` — client build + server/shared typecheck
 
 ## Layout
 
-npm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on Node, run via tsx; SQLite via node:sqlite in `server/data/`), `shared/` (`@bingus/shared` — the wire protocol).
+pnpm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on Node, run via tsx; SQLite via node:sqlite in `server/data/`), `shared/` (`@bingus/shared` — the wire protocol).
 
 ## Non-negotiable conventions
 
