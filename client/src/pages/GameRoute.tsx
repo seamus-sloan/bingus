@@ -4,6 +4,7 @@ import { useGameRoom } from '../lib/gameRoom'
 import { GameOverPage } from './GameOverPage'
 import { GamePlayPage } from './GamePlayPage'
 import { LobbyPage } from './LobbyPage'
+import styles from './GameRoute.module.css'
 
 // /game/:code — joins the table over the socket and hands the live room to
 // the right screen: lobby before the host starts, gameplay while playing,
@@ -22,8 +23,8 @@ function GameRoomScreens({ code }: { code: string }) {
     return (
       <>
         <AppHeader />
-        <main style={{ padding: '56px 72px', fontWeight: 700 }}>
-          Pulling up a chair…
+        <main className={styles.main}>
+          <p className={styles.status}>Pulling up a chair…</p>
         </main>
       </>
     )
@@ -33,12 +34,16 @@ function GameRoomScreens({ code }: { code: string }) {
     return (
       <>
         <AppHeader />
-        <main style={{ padding: '56px 72px' }}>
-          <p style={{ fontWeight: 700 }} role="alert">
+        <main className={styles.main}>
+          <p className={styles.error} role="alert">
             {status.message}
           </p>
-          <button type="button" onClick={() => navigate('/boards')}>
-            Back to the archive
+          <button
+            className={styles.backButton}
+            type="button"
+            onClick={() => navigate('/boards')}
+          >
+            Back to the archive →
           </button>
         </main>
       </>

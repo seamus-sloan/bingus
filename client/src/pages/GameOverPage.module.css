@@ -348,6 +348,137 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.restPlayer:hover .restBoard {
+  box-shadow: 3px 3px 0 rgba(43, 27, 51, 0.35);
+}
+
+.restHint {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--faint);
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.winRest {
+  margin-top: 26px;
+  text-align: center;
+}
+
+.winRest .restLabel {
+  text-align: center;
+}
+
+.winRestGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.winRestGrid .restPlayer {
+  width: 100px;
+}
+
+.peekBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 27, 51, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 24px;
+}
+
+.peekCard {
+  width: 380px;
+  max-width: 100%;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 9px 9px 0 var(--ink);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.peekHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.peekHead .avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.peekTitle {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+  line-height: 1;
+  margin: 0;
+}
+
+.peekSub {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--faint);
+  margin: 3px 0 0;
+}
+
+.peekClose {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  background: var(--cream);
+  color: var(--ink);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.peekGrid {
+  display: grid;
+  gap: 4px;
+}
+
+.peekCell {
+  aspect-ratio: 1;
+  border: 2px solid var(--ink);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2px;
+  font-weight: 700;
+  font-size: 7.5px;
+  line-height: 1.15;
+  background: var(--paper);
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.peekCellFree {
+  background: var(--yellow);
+  font-weight: 800;
 }
 
 .restBoard {

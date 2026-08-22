@@ -319,7 +319,7 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
                   </span>
                   <p className={styles.chatBody}>
                     <strong className={styles.chatName}>
-                      {m.player.name}
+                      {m.player.name}:
                     </strong>{' '}
                     {m.text}
                   </p>

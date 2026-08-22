@@ -143,6 +143,19 @@ describe('game over screen — win', () => {
     expect(room.rematch).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps rivals\' boards visible with click-to-peek', async () => {
+    renderGameOver(makeRoom(winState()))
+    expect(await screen.findByText('THE REST OF THE TABLE')).toBeDefined()
+    expect(screen.getByRole('button', { name: "Kai's board" })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: "Zoe's board" }))
+    const peek = screen.getByRole('dialog', { name: "Zoe's full card" })
+    expect(peek.textContent).toContain("Zoe's card")
+    fireEvent.click(screen.getByRole('button', { name: 'Close peek' }))
+    expect(
+      screen.queryByRole('dialog', { name: "Zoe's full card" }),
+    ).toBeNull()
+  })
+
   it('"Back to the homepage" navigates to /', async () => {
     renderGameOver(makeRoom(winState()))
     fireEvent.click(
@@ -166,9 +179,23 @@ describe('game over screen — lose', () => {
     expect(card.textContent).toContain('z8')
     expect(card.textContent).toContain('FREE')
     // Non-winners get mini mark-boards; the winner does not appear there.
-    expect(screen.getByRole('group', { name: "Ruth's board" })).toBeDefined()
-    expect(screen.getByRole('group', { name: "Kai's board" })).toBeDefined()
-    expect(screen.queryByRole('group', { name: "Zoe's board" })).toBeNull()
+    expect(screen.getByRole('button', { name: "Ruth's board" })).toBeDefined()
+    expect(screen.getByRole('button', { name: "Kai's board" })).toBeDefined()
+    expect(screen.queryByRole('button', { name: "Zoe's board" })).toBeNull()
+  })
+
+  it('clicking a rest-of-table board opens their full card as a peek', async () => {
+    renderGameOver(makeRoom(loseState()))
+    fireEvent.click(await screen.findByRole('button', { name: "Kai's board" }))
+    const peek = screen.getByRole('dialog', { name: "Kai's full card" })
+    expect(peek.textContent).toContain("Kai's card")
+    expect(peek.textContent).toContain('2 tiles · so close')
+    expect(peek.textContent).toContain('k1')
+    expect(peek.textContent).toContain('FREE')
+    fireEvent.click(screen.getByRole('button', { name: 'Close peek' }))
+    expect(
+      screen.queryByRole('dialog', { name: "Kai's full card" }),
+    ).toBeNull()
   })
 
   it('"Run it back" calls room.rematch and surfaces a returned error', async () => {

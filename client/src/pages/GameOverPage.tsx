@@ -84,6 +84,7 @@ function cellTerm(gp: GamePlayer, cell: number, free: number): string {
 
 function WinScreen({
   me,
+  rest,
   size,
   winner,
   pending,
@@ -92,6 +93,7 @@ function WinScreen({
   onExit,
 }: {
   me: GamePlayer
+  rest: GamePlayer[]
   size: BoardSize
   winner: GameWinner
   pending: boolean
@@ -100,6 +102,8 @@ function WinScreen({
   onExit: () => void
 }) {
   const free = freeIndex(size)
+  const [peekId, setPeekId] = useState<string | null>(null)
+  const peeked = rest.find((p) => p.player.id === peekId)
   return (
     <div className={styles.winScreen}>
       {FLOATS.map((f, i) => (
@@ -162,6 +166,24 @@ function WinScreen({
             )
           })}
         </div>
+        {rest.length > 0 && (
+          <aside className={styles.winRest}>
+            <p className={styles.restLabel}>THE REST OF THE TABLE</p>
+            <div className={styles.winRestGrid}>
+              {rest.map((gp) => (
+                <RestBoard
+                  key={gp.player.id}
+                  gp={gp}
+                  size={size}
+                  onPeek={() => setPeekId(gp.player.id)}
+                />
+              ))}
+            </div>
+            <p className={styles.restHint}>
+              click any board to see every cell
+            </p>
+          </aside>
+        )}
         <div className={styles.actions}>
           <button
             className={styles.ctaPrimary}
@@ -181,18 +203,34 @@ function WinScreen({
           </p>
         )}
       </div>
+      {peeked && (
+        <PeekCard
+          gp={peeked}
+          size={size}
+          onClose={() => setPeekId(null)}
+        />
+      )}
     </div>
   )
 }
 
-function RestBoard({ gp, size }: { gp: GamePlayer; size: BoardSize }) {
+function RestBoard({
+  gp,
+  size,
+  onPeek,
+}: {
+  gp: GamePlayer
+  size: BoardSize
+  onPeek: () => void
+}) {
   const free = freeIndex(size)
   const accent = accentFor(gp.player.id)
   return (
-    <div
+    <button
       className={styles.restPlayer}
-      role="group"
+      type="button"
       aria-label={`${gp.player.name}'s board`}
+      onClick={onPeek}
     >
       <span
         className={styles.restBoard}
@@ -216,6 +254,76 @@ function RestBoard({ gp, size }: { gp: GamePlayer; size: BoardSize }) {
         </span>
         {gp.player.name}
       </span>
+    </button>
+  )
+}
+
+// Full-cell view of a rival's card, opened by clicking their mini board.
+function PeekCard({
+  gp,
+  size,
+  onClose,
+}: {
+  gp: GamePlayer
+  size: BoardSize
+  onClose: () => void
+}) {
+  const free = freeIndex(size)
+  const accent = accentFor(gp.player.id)
+  const tiles = gp.marks.length + 1 // FREE rides along
+  return (
+    <div className={styles.peekBackdrop} onClick={onClose}>
+      <div
+        className={styles.peekCard}
+        role="dialog"
+        aria-label={`${gp.player.name}'s full card`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.peekHead}>
+          <span className={styles.avatar} style={{ background: accent }}>
+            {gp.player.name[0]?.toUpperCase()}
+          </span>
+          <div>
+            <p className={styles.peekTitle}>{gp.player.name}'s card</p>
+            <p className={styles.peekSub}>
+              {tiles} tile{tiles === 1 ? '' : 's'} · so close
+            </p>
+          </div>
+          <button
+            className={styles.peekClose}
+            type="button"
+            aria-label="Close peek"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div
+          className={styles.peekGrid}
+          style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+        >
+          {Array.from({ length: size * size }, (_, cell) => {
+            const isFree = cell === free
+            const marked = isFree || gp.marks.includes(cell)
+            return (
+              <span
+                key={cell}
+                className={[
+                  styles.peekCell,
+                  isFree && styles.peekCellFree,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                style={
+                  marked && !isFree ? { background: accent } : undefined
+                }
+              >
+                {isFree ? 'FREE' : cellTerm(gp, cell, free)}
+              </span>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -242,6 +350,8 @@ function LoseScreen({
   const winnerName = winnerSeat.player.name
   const accent = accentFor(winnerSeat.player.id)
   const rest = state.players.filter((p) => p.player.id !== winner.playerId)
+  const [peekId, setPeekId] = useState<string | null>(null)
+  const peeked = rest.find((p) => p.player.id === peekId)
   return (
     <div className={styles.loseScreen}>
       <div className={styles.loseInner}>
@@ -305,12 +415,20 @@ function LoseScreen({
             <p className={styles.winnerLine}>
               {winnerName} · {WIN_PHRASE[winner.pattern]}
             </p>
+            <p className={styles.restHint}>
+              click any board to see every cell — the winner's is already open
+            </p>
           </section>
           <section>
             <p className={styles.restLabel}>THE REST OF THE TABLE</p>
             <div className={styles.restGrid}>
               {rest.map((gp) => (
-                <RestBoard key={gp.player.id} gp={gp} size={size} />
+                <RestBoard
+                  key={gp.player.id}
+                  gp={gp}
+                  size={size}
+                  onPeek={() => setPeekId(gp.player.id)}
+                />
               ))}
             </div>
             <div className={styles.loseCard}>
@@ -346,6 +464,13 @@ function LoseScreen({
           </section>
         </div>
       </div>
+      {peeked && (
+        <PeekCard
+          gp={peeked}
+          size={size}
+          onClose={() => setPeekId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -380,6 +505,7 @@ export function GameOverPage({ room }: { room: GameRoomView }) {
   return winner.playerId === player.id ? (
     <WinScreen
       me={me}
+      rest={state.players.filter((p) => p.player.id !== player.id)}
       size={state.board.size}
       winner={winner}
       pending={pending}
