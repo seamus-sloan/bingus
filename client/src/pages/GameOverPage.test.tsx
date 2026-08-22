@@ -91,7 +91,7 @@ function renderGameOver(room: GameRoomView) {
       <SessionProvider>
         <Routes>
           <Route path="/game/:code" element={<GameOverPage room={room} />} />
-          <Route path="/boards" element={<h2>Archive probe</h2>} />
+          <Route path="/" element={<h2>Home probe</h2>} />
         </Routes>
       </SessionProvider>
     </MemoryRouter>,
@@ -143,12 +143,12 @@ describe('game over screen — win', () => {
     expect(room.rematch).toHaveBeenCalledTimes(1)
   })
 
-  it('"Back to the archive" navigates to /boards', async () => {
+  it('"Back to the homepage" navigates to /', async () => {
     renderGameOver(makeRoom(winState()))
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Back to the archive' }),
+      await screen.findByRole('button', { name: 'Back to the homepage' }),
     )
-    expect(await screen.findByText('Archive probe')).toBeDefined()
+    expect(await screen.findByText('Home probe')).toBeDefined()
   })
 })
 
@@ -182,11 +182,11 @@ describe('game over screen — lose', () => {
     )
   })
 
-  it('"Return to the archive" navigates to /boards', async () => {
+  it('"Return to the homepage" navigates to /', async () => {
     renderGameOver(makeRoom(loseState()))
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Return to the archive' }),
+      await screen.findByRole('button', { name: 'Return to the homepage' }),
     )
-    expect(await screen.findByText('Archive probe')).toBeDefined()
+    expect(await screen.findByText('Home probe')).toBeDefined()
   })
 })

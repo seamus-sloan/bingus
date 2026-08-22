@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { PLAYER_NAME_MAX } from '@bingus/shared'
 import { ApiError } from '../lib/api'
 import { useSession } from '../lib/session'
@@ -44,8 +45,10 @@ export function AppHeader() {
 
   return (
     <header className={styles.header}>
-      <div className={styles.logoDot} />
-      <h1 className={styles.wordmark}>Bingus</h1>
+      <Link to="/" className={styles.homeLink}>
+        <div className={styles.logoDot} />
+        <h1 className={styles.wordmark}>Bingus</h1>
+      </Link>
       <div className={styles.profileWrap}>
         <button
           type="button"

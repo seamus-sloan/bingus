@@ -172,7 +172,7 @@ function WinScreen({
             Run it back 🔁
           </button>
           <button className={styles.ctaGhost} type="button" onClick={onExit}>
-            Back to the archive
+            Back to the homepage
           </button>
         </div>
         {error && (
@@ -334,7 +334,7 @@ function LoseScreen({
                   type="button"
                   onClick={onExit}
                 >
-                  Return to the archive
+                  Return to the homepage
                 </button>
               </div>
               {error && (
@@ -375,7 +375,7 @@ export function GameOverPage({ room }: { room: GameRoomView }) {
     setPending(false)
   }
 
-  const onExit = () => navigate('/boards')
+  const onExit = () => navigate('/')
 
   return winner.playerId === player.id ? (
     <WinScreen
