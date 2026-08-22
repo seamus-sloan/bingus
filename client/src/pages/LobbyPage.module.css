@@ -1,0 +1,233 @@
+.screen {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.float {
+  position: absolute;
+  border: 2.5px solid var(--ink);
+  animation: dfloat var(--dur) ease-in-out var(--delay) infinite;
+}
+
+.card {
+  width: 640px;
+  max-width: 100%;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 28px;
+  box-shadow: 10px 10px 0 var(--ink);
+  padding: 40px 48px;
+  text-align: center;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 16px;
+  background: var(--lime);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  box-shadow: 2px 2px 0 var(--ink);
+  transform: rotate(-2deg);
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: dpulse 1.6s ease-in-out infinite;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 42px;
+  letter-spacing: -1.5px;
+  margin: 16px 0 8px;
+}
+
+.subline {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 26px;
+}
+
+.codeRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.tile {
+  width: 44px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  box-shadow: 3px 3px 0 var(--ink);
+  box-sizing: border-box;
+}
+
+.tileLetter {
+  background: var(--yellow);
+}
+
+.tileDash {
+  background: var(--cream);
+}
+
+.players {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 6px;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.chipOffline {
+  opacity: 0.45;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.chipName {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.hostTag {
+  padding: 2px 8px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.waitingChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border: 2.5px dashed var(--faint);
+  border-radius: 999px;
+  color: var(--faint);
+  font-weight: 700;
+  font-size: 14px;
+  animation: dpulse 3.2s ease-in-out infinite;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.startBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 26px;
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  border: 3px solid var(--ink);
+  box-shadow: 5px 5px 0 var(--ink);
+  cursor: pointer;
+}
+
+.startBtn:active {
+  translate: 2px 2px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.startBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.arrow {
+  font-size: 19px;
+}
+
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 26px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 17px;
+  border: 3px solid var(--ink);
+  box-shadow: 5px 5px 0 var(--ink);
+  cursor: pointer;
+}
+
+.copyBtn:active {
+  translate: 2px 2px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.hostWait {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--faint);
+  margin: 0;
+}
+
+.error {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--magenta);
+  margin: 14px 0 0;
+}
