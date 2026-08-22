@@ -27,6 +27,7 @@ Current endpoints:
 - `POST /api/boards` — print a fresh board (session required). Validates term count (`size² - 1`, one tile is FREE at `freeIndex(size)`) and term uniqueness via the shared schema; `400 invalid_board` with a message on failure.
 - `GET /api/boards/:id` / `PATCH /api/boards/:id` — fetch one board / edit it (session required; only the creator may edit, `403 unauthorized` otherwise).
 - `POST /api/games` — open a live table for a board (session required). Returns the join code (`BNGS-nnn`); everything after creation happens over the socket.
+- `GET /api/games` — list joinable tables (lobby + playing, newest first) for the Live Tables screen, which polls it every 5s.
 
 - In **dev**, the client calls same-origin paths (`fetch('/api/...')`) and the Vite dev server proxies them to `http://localhost:3000` (see [client/vite.config.ts](../client/vite.config.ts)). No CORS anywhere.
 - In **prod**, the client build is static and is expected to be served from the same origin as the server, so the same same-origin calls work unchanged.
@@ -52,7 +53,7 @@ Adding a feature that needs a new message = add the schema + event signature to 
 
 The server is the referee. Board shuffles are generated server-side per player (so cards can't be re-rolled and rivals' boards render consistently), and win claims are validated server-side against the marked set (row / column / diagonal / blackout). Clients render state and report intents; they never decide outcomes.
 
-Active game state lives in memory on the single server process (`server/src/games.ts`: one `GameRoom` per table, managed by `GameManager`); the board archive and players live in SQLite. Rooms deal each joiner a shuffled card server-side, referee every mark (row / column / diagonal / blackout detection), and get swept once finished and empty. The socket layer (`server/src/socket.ts`) authenticates the handshake with the session cookie, joins one room per socket, and broadcasts the full public game state on every change — at friends scale, simplicity beats deltas. Socket events are typed end-to-end via `ClientToServerEvents` / `ServerToClientEvents` in the shared protocol; the client consumes them through the `useGameRoom` hook (`client/src/lib/gameRoom.ts`), with `/game/:code` switching between the lobby and gameplay screens by game status.
+Active game state lives in memory on the single server process (`server/src/games.ts`: one `GameRoom` per table, managed by `GameManager`); the board archive and players live in SQLite. Rooms deal each joiner a shuffled card server-side (capped at `GAME_MAX_PLAYERS` = 8 seats), referee every mark (row / column / diagonal / blackout detection), support a `game:rematch` event (any seated player resets a finished table — fresh cards, back to the lobby), and get swept once finished and empty. The socket layer (`server/src/socket.ts`) authenticates the handshake with the session cookie, joins one room per socket, and broadcasts the full public game state on every change — at friends scale, simplicity beats deltas. Socket events are typed end-to-end via `ClientToServerEvents` / `ServerToClientEvents` in the shared protocol; the client consumes them through the `useGameRoom` hook (`client/src/lib/gameRoom.ts`), with `/game/:code` switching between the lobby and gameplay screens by game status.
 
 ## Persistence & identity
 
