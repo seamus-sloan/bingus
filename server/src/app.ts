@@ -1,14 +1,18 @@
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import {
+  CreateBoardRequestSchema,
   CreatePlayerRequestSchema,
+  ListBoardsQuerySchema,
   RenamePlayerRequestSchema,
   type ApiError,
+  type CreateBoardResponse,
   type CreatePlayerResponse,
+  type ListBoardsResponse,
   type MeResponse,
   type StatsResponse,
 } from "@bingus/shared";
-import type { PlayersRepo } from "./db.ts";
+import type { BoardsRepo, PlayersRepo } from "./db.ts";
 
 // The session cookie holds the player's token. httpOnly keeps it out of
 // reach of client-side JS; the browser sends it on every same-origin request
@@ -18,7 +22,7 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // a year of trash talk
 
 // HTTP surface: REST endpoints live here (players, board archive, health).
 // Realtime traffic goes through Socket.IO — see socket.ts.
-export function createApp(players: PlayersRepo) {
+export function createApp(players: PlayersRepo, boards: BoardsRepo) {
   const app = new Hono();
 
   const currentPlayer = (c: Context) => {
@@ -33,11 +37,41 @@ export function createApp(players: PlayersRepo) {
   app.get("/api/stats", (c) =>
     c.json({
       players: players.count(),
-      // Boards and live games land with their screens (board archive, lobby).
-      boards: 0,
+      boards: boards.count(),
+      // Live games land with the lobby.
       liveGames: 0,
     } satisfies StatsResponse),
   );
+
+  app.get("/api/boards", (c) => {
+    const query = ListBoardsQuerySchema.safeParse(c.req.query());
+    if (!query.success) {
+      return c.json(
+        { code: "invalid_board", error: "Bad archive query." } satisfies ApiError,
+        400,
+      );
+    }
+    return c.json(boards.list(query.data) satisfies ListBoardsResponse);
+  });
+
+  app.post("/api/boards", async (c) => {
+    const me = currentPlayer(c);
+    if (!me) return c.json(unauthorized(), 401);
+    const body = CreateBoardRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!body.success) {
+      return c.json(
+        {
+          code: "invalid_board",
+          error: body.error.issues[0]?.message ?? "That board won't print.",
+        } satisfies ApiError,
+        400,
+      );
+    }
+    const board = boards.create(body.data, me.player.id);
+    return c.json({ board } satisfies CreateBoardResponse, 201);
+  });
 
   app.post("/api/players", async (c) => {
     const body = CreatePlayerRequestSchema.safeParse(

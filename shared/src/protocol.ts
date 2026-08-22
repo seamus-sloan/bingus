@@ -17,9 +17,87 @@ export const PlayerSchema = z.object({
 });
 export type Player = z.infer<typeof PlayerSchema>;
 
+// --- Boards --------------------------------------------------------------
+// A board is a named set of terms. Every player in a game gets the same
+// terms shuffled into their own card; the center tile is a FREE space, so a
+// size-n board needs n*n - 1 terms.
+//
+// GET  /api/boards?search=&limit=&offset= — browse the archive (newest first).
+// POST /api/boards — print a fresh board (requires a session).
+
+export const BOARD_SIZES = [3, 4, 5] as const;
+export const BoardSizeSchema = z.union([
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+]);
+export type BoardSize = z.infer<typeof BoardSizeSchema>;
+
+export const BOARD_NAME_MAX = 60;
+export const TERM_MAX = 80;
+
+/** Terms a board of this size needs (center tile is FREE). */
+export function termsRequired(size: BoardSize): number {
+  return size * size - 1;
+}
+
+export const BoardNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Name the board first.")
+  .max(BOARD_NAME_MAX, `Keep it under ${BOARD_NAME_MAX} characters.`);
+
+export const BoardTermSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(TERM_MAX, `Terms max out at ${TERM_MAX} characters.`);
+
+export const BoardSchema = z.object({
+  id: z.string(),
+  name: BoardNameSchema,
+  size: BoardSizeSchema,
+  terms: z.array(BoardTermSchema),
+  createdBy: z.string(),
+  plays: z.number().int().nonnegative(),
+  createdAt: z.string(), // ISO 8601
+});
+export type Board = z.infer<typeof BoardSchema>;
+
+export const ListBoardsQuerySchema = z.object({
+  search: z.string().trim().max(BOARD_NAME_MAX).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+export type ListBoardsQuery = z.infer<typeof ListBoardsQuerySchema>;
+
+export const ListBoardsResponseSchema = z.object({
+  boards: z.array(BoardSchema),
+  total: z.number().int().nonnegative(),
+});
+export type ListBoardsResponse = z.infer<typeof ListBoardsResponseSchema>;
+
+export const CreateBoardRequestSchema = z
+  .object({
+    name: BoardNameSchema,
+    size: BoardSizeSchema,
+    terms: z.array(BoardTermSchema),
+  })
+  .refine((b) => b.terms.length === termsRequired(b.size), {
+    message: "Term count must match the board size (center tile is free).",
+  })
+  .refine(
+    (b) => new Set(b.terms.map((t) => t.toLowerCase())).size === b.terms.length,
+    { message: "No duplicate terms — keep it spicy, keep it varied." },
+  );
+export type CreateBoardRequest = z.infer<typeof CreateBoardRequestSchema>;
+
+export const CreateBoardResponseSchema = z.object({ board: BoardSchema });
+export type CreateBoardResponse = z.infer<typeof CreateBoardResponseSchema>;
+
 // --- REST: stats ---------------------------------------------------------
-// GET /api/stats — the Home screen's live numbers. `boards` and `liveGames`
-// stay 0 until the board archive and game tables exist.
+// GET /api/stats — the Home screen's live numbers. `liveGames` stays 0 until
+// game tables exist.
 
 export const StatsResponseSchema = z.object({
   players: z.number().int().nonnegative(),
@@ -50,7 +128,7 @@ export const RenamePlayerRequestSchema = z.object({ name: PlayerNameSchema });
 export type RenamePlayerRequest = z.infer<typeof RenamePlayerRequestSchema>;
 
 export const ApiErrorSchema = z.object({
-  code: z.enum(["invalid_name", "name_taken", "unauthorized"]),
+  code: z.enum(["invalid_name", "name_taken", "invalid_board", "unauthorized"]),
   error: z.string(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

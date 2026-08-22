@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import type { StatsResponse } from '@bingus/shared'
 import { AppHeader } from '../components/AppHeader'
 import { getStats } from '../lib/api'
@@ -10,6 +11,7 @@ import styles from './HomePage.module.css'
 // "coming soon" toast.
 export function HomePage() {
   const { player } = useSession()
+  const navigate = useNavigate()
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -51,7 +53,11 @@ export function HomePage() {
               Pick a board from the archive or print a fresh one. Then watch
               them crumble.
             </p>
-            <button className={styles.newCta} type="button" onClick={comingSoon}>
+            <button
+              className={styles.newCta}
+              type="button"
+              onClick={() => navigate('/boards')}
+            >
               Let's go →
             </button>
           </section>

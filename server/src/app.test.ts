@@ -2,16 +2,21 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
 import type {
   ApiError,
+  Board,
+  CreateBoardRequest,
+  CreateBoardResponse,
   CreatePlayerResponse,
+  ListBoardsResponse,
   MeResponse,
 } from "@bingus/shared";
 import { createApp, SESSION_COOKIE } from "./app.ts";
-import { openDb, PlayersRepo } from "./db.ts";
+import { BoardsRepo, openDb, PlayersRepo } from "./db.ts";
 
 let app: Hono;
 
 beforeEach(() => {
-  app = createApp(new PlayersRepo(openDb(":memory:")));
+  const db = openDb(":memory:");
+  app = createApp(new PlayersRepo(db), new BoardsRepo(db));
 });
 
 // Test-only view of a response body: success and error fields both visible,
@@ -46,6 +51,91 @@ async function rename(cookie: string, name: string) {
   });
   return { status: res.status, body: (await res.json()) as Body<MeResponse> };
 }
+
+const TERMS8 = ["a", "b", "c", "d", "e", "f", "g", "h"];
+
+async function createBoard(
+  cookie: string,
+  req: Partial<CreateBoardRequest> = {},
+) {
+  const res = await app.request("/api/boards", {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: JSON.stringify({ name: "Standup Standoff", size: 3, terms: TERMS8, ...req }),
+  });
+  return {
+    status: res.status,
+    body: (await res.json()) as Body<CreateBoardResponse>,
+  };
+}
+
+async function listBoards(qs = "") {
+  const res = await app.request(`/api/boards${qs}`);
+  return {
+    status: res.status,
+    body: (await res.json()) as Body<ListBoardsResponse>,
+  };
+}
+
+describe("boards", () => {
+  it("creates a board and lists it newest-first", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie);
+    expect(created.status).toBe(201);
+    const board: Board = created.body.board;
+    expect(board.name).toBe("Standup Standoff");
+    expect(board.createdBy).toBe("Ruth");
+    expect(board.plays).toBe(0);
+    await createBoard(cookie, { name: "Meeting Mayhem" });
+    const { body } = await listBoards();
+    expect(body.total).toBe(2);
+    expect(body.boards.map((b) => b.name)).toEqual([
+      "Meeting Mayhem",
+      "Standup Standoff",
+    ]);
+  });
+
+  it("requires a session to create", async () => {
+    const created = await createBoard(`${SESSION_COOKIE}=bogus`);
+    expect(created.status).toBe(401);
+    expect(created.body.code).toBe("unauthorized");
+  });
+
+  it("rejects a term count that does not match the size", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie, { size: 5 });
+    expect(created.status).toBe(400);
+    expect(created.body.code).toBe("invalid_board");
+  });
+
+  it("rejects duplicate terms", async () => {
+    const { cookie } = await signIn("Ruth");
+    const created = await createBoard(cookie, {
+      terms: ["a", "b", "c", "d", "e", "f", "g", "A"],
+    });
+    expect(created.status).toBe(400);
+    expect(created.body.code).toBe("invalid_board");
+  });
+
+  it("searches and paginates", async () => {
+    const { cookie } = await signIn("Ruth");
+    await createBoard(cookie, { name: "Standup Standoff" });
+    await createBoard(cookie, { name: "Meeting Mayhem" });
+    await createBoard(cookie, { name: "Stand and Deliver" });
+    const search = await listBoards("?search=stand");
+    expect(search.body.total).toBe(2);
+    const page = await listBoards("?limit=1&offset=1");
+    expect(page.body.boards).toHaveLength(1);
+    expect(page.body.total).toBe(3);
+  });
+
+  it("counts boards in stats", async () => {
+    const { cookie } = await signIn("Ruth");
+    await createBoard(cookie);
+    const res = await app.request("/api/stats");
+    expect(((await res.json()) as { boards: number }).boards).toBe(1);
+  });
+});
 
 describe("GET /api/health", () => {
   it("reports the service as healthy", async () => {

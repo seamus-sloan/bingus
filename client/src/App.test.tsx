@@ -45,6 +45,9 @@ function mockApi({
       if (url === '/api/stats') {
         return Promise.resolve(jsonResponse(200, stats))
       }
+      if (url.startsWith('/api/boards') && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { boards: [], total: 0 }))
+      }
       return Promise.resolve(jsonResponse(404, { code: 'unauthorized', error: 'nope' }))
     },
   )
@@ -55,6 +58,8 @@ function mockApi({
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  // BrowserRouter reads jsdom's shared location — reset it between tests.
+  window.history.replaceState({}, '', '/')
 })
 
 describe('session gate', () => {
@@ -139,10 +144,21 @@ describe('home screen', () => {
     expect(screen.getByText(/3 tables are playing right now/)).toBeDefined()
   })
 
-  it('raises a coming-soon toast from the CTAs', async () => {
+  it('navigates to the board archive from the new-game CTA', async () => {
     mockApi({ me: { id: 'p1', name: 'Ruth' } })
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /Let's go/ }))
+    expect(
+      await screen.findByRole('heading', { name: /Pick your battlefield/ }),
+    ).toBeDefined()
+  })
+
+  it('raises a coming-soon toast from the join CTA', async () => {
+    mockApi({ me: { id: 'p1', name: 'Ruth' } })
+    render(<App />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /See live tables/ }),
+    )
     expect((await screen.findByRole('status')).textContent).toContain(
       'still at the printers',
     )

@@ -1,21 +1,34 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { BoardArchivePage } from './pages/BoardArchivePage'
+import { CreateBoardPage } from './pages/CreateBoardPage'
 import { HomePage } from './pages/HomePage'
 import { SignInPage } from './pages/SignInPage'
 import { SessionProvider, useSession } from './lib/session'
 
-// Route guard, pre-router: anything that isn't the sign-in screen renders
-// only in the signed-in branch. When a router lands, this becomes a proper
-// guard around every authenticated route.
+// Route guard: every authenticated route lives inside the signed-in branch.
+// Signed-out (including ghost sessions the server 401'd) always renders the
+// sign-in screen, whatever the URL.
 function Screens() {
   const { status } = useSession()
   if (status === 'loading') return null // brief blank cream while /api/me resolves
-  return status === 'signed-in' ? <HomePage /> : <SignInPage />
+  if (status !== 'signed-in') return <SignInPage />
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/boards" element={<BoardArchivePage />} />
+      <Route path="/boards/new" element={<CreateBoardPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }
 
 function App() {
   return (
-    <SessionProvider>
-      <Screens />
-    </SessionProvider>
+    <BrowserRouter>
+      <SessionProvider>
+        <Screens />
+      </SessionProvider>
+    </BrowserRouter>
   )
 }
 

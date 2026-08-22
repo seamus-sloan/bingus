@@ -1,10 +1,16 @@
 import {
   ApiErrorSchema,
+  CreateBoardResponseSchema,
   CreatePlayerResponseSchema,
+  ListBoardsResponseSchema,
   MeResponseSchema,
   type ApiErrorCode,
+  type CreateBoardRequest,
+  type CreateBoardResponse,
   type CreatePlayerRequest,
   type CreatePlayerResponse,
+  type ListBoardsQuery,
+  type ListBoardsResponse,
   type MeResponse,
   type RenamePlayerRequest,
   StatsResponseSchema,
@@ -40,6 +46,29 @@ async function request<T>(
 
 export function getStats(): Promise<StatsResponse> {
   return request('/api/stats', {}, (data) => StatsResponseSchema.parse(data))
+}
+
+export function listBoards(
+  query: Partial<ListBoardsQuery> = {},
+): Promise<ListBoardsResponse> {
+  const params = new URLSearchParams()
+  if (query.search) params.set('search', query.search)
+  if (query.limit !== undefined) params.set('limit', String(query.limit))
+  if (query.offset !== undefined) params.set('offset', String(query.offset))
+  const qs = params.size ? `?${params}` : ''
+  return request(`/api/boards${qs}`, {}, (data) =>
+    ListBoardsResponseSchema.parse(data),
+  )
+}
+
+export function createBoard(
+  board: CreateBoardRequest,
+): Promise<CreateBoardResponse> {
+  return request(
+    '/api/boards',
+    { method: 'POST', body: JSON.stringify(board) },
+    (data) => CreateBoardResponseSchema.parse(data),
+  )
 }
 
 // Sign in. The server responds with the player and sets the httpOnly session

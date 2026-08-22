@@ -1,13 +1,14 @@
 import { serve } from "@hono/node-server";
 import type { Server as HttpServer } from "node:http";
 import { createApp } from "./app.ts";
-import { openDb, PlayersRepo } from "./db.ts";
+import { BoardsRepo, openDb, PlayersRepo } from "./db.ts";
 import { attachSocket } from "./socket.ts";
 
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.BINGUS_DB ?? "data/bingus.db";
 
-const app = createApp(new PlayersRepo(openDb(dbPath)));
+const db = openDb(dbPath);
+const app = createApp(new PlayersRepo(db), new BoardsRepo(db));
 
 // serve() returns the underlying node:http server; Socket.IO attaches to it
 // and claims /socket.io/*, Hono handles every other route.
