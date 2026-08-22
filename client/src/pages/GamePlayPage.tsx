@@ -1,14 +1,446 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router'
+import {
+  freeIndex,
+  type BoardSize,
+  type GamePlayer,
+  type GameWinner,
+  type WinPattern,
+} from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
+import { useSession } from '../lib/session'
+import styles from './GamePlayPage.module.css'
 
-// Stub — mockup 1g (gameplay) is being built on its own branch. The room
-// prop carries live state + actions; only this file changes.
-export function GamePlayPage({ room }: { room: GameRoomView }) {
+// Mockup 1g — the live table. My card in the main column, rivals' mini
+// boards + trash-talk chat in the right rail, and the win/lose overlay
+// (mockup 1i energy) once the server declares a winner.
+
+// Candy accents for rivals + chat avatars, derived from the player id so a
+// player keeps their color across renders without storing anything.
+const CANDY = ['#FFD43B', '#A3E635', '#FF8FC1', '#7DD3FC', '#C89BF5', '#FFA94D']
+
+function hashId(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+function accentFor(id: string): string {
+  return CANDY[hashId(id) % CANDY.length]
+}
+
+const WIN_BADGE: Record<WinPattern, string> = {
+  row: 'ROW, BABY',
+  column: 'COLUMN, BABY',
+  diagonal: 'DIAGONAL, BABY',
+  blackout: 'TOTAL BLACKOUT',
+}
+
+const WIN_PHRASE: Record<WinPattern, string> = {
+  row: 'full row across',
+  column: 'column',
+  diagonal: 'diagonal',
+  blackout: 'full blackout',
+}
+
+// Static confetti layout — deterministic so render stays pure.
+const CONFETTI = Array.from({ length: 40 }, (_, i) => ({
+  left: (i * 83) % 100,
+  delay: ((i * 37) % 20) / 10,
+  duration: 2.6 + ((i * 53) % 14) / 10,
+  color: CANDY[i % CANDY.length],
+}))
+
+// A tiny celebratory pop on marking a tile. Pure garnish: any environment
+// without WebAudio (tests, muted autoplay policies) just stays silent.
+let audioCtx: AudioContext | null = null
+function playPop() {
+  try {
+    audioCtx ??= new AudioContext()
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.frequency.value = 640
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12)
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.start()
+    osc.stop(audioCtx.currentTime + 0.13)
+  } catch {
+    // no audio, no problem
+  }
+}
+
+// Cells run 0..size²-1 with the FREE tile at freeIndex(size); the card array
+// omits FREE, so terms after it shift down by one.
+function cellTerm(gp: GamePlayer, cell: number, free: number): string {
+  return gp.card[cell < free ? cell : cell - 1]
+}
+
+function GamePlayRival({
+  rival,
+  size,
+  onPeek,
+}: {
+  rival: GamePlayer
+  size: BoardSize
+  onPeek: () => void
+}) {
+  const free = freeIndex(size)
+  const accent = accentFor(rival.player.id)
   return (
-    <main style={{ padding: '56px 72px' }}>
-      <h2>{room.state.board.name}</h2>
-      <p>
-        Game {room.state.code} is {room.state.status}. Screen coming right up.
+    <button className={styles.rival} type="button" onClick={onPeek}>
+      <span
+        className={styles.rivalGrid}
+        style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+        aria-hidden
+      >
+        {Array.from({ length: size * size }, (_, cell) => (
+          <span
+            key={cell}
+            className={styles.rivalCell}
+            style={{
+              background:
+                cell === free || rival.marks.includes(cell)
+                  ? accent
+                  : '#F1E9F4',
+            }}
+          />
+        ))}
+      </span>
+      <span className={styles.rivalName}>
+        <span className={styles.avatar} style={{ background: accent }}>
+          {rival.player.name[0]?.toUpperCase()}
+        </span>
+        {rival.player.name}
+      </span>
+      <span className={styles.rivalCount}>{rival.marks.length + 1} tiles</span>
+    </button>
+  )
+}
+
+function GamePlayPeek({
+  rival,
+  size,
+  onClose,
+}: {
+  rival: GamePlayer
+  size: BoardSize
+  onClose: () => void
+}) {
+  const free = freeIndex(size)
+  const accent = accentFor(rival.player.id)
+  return (
+    <div className={styles.peek}>
+      <button
+        className={styles.peekClose}
+        type="button"
+        aria-label="Close peek"
+        onClick={onClose}
+      >
+        ×
+      </button>
+      <h3 className={styles.peekTitle}>{`${rival.player.name}'s card`}</h3>
+      <p className={styles.peekSub}>
+        {rival.marks.length + 1} tiles · updating live
       </p>
-    </main>
+      <div
+        className={styles.peekGrid}
+        style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+      >
+        {Array.from({ length: size * size }, (_, cell) => {
+          const isFree = cell === free
+          const marked = isFree || rival.marks.includes(cell)
+          return (
+            <span
+              key={cell}
+              className={styles.peekCell}
+              style={{
+                background: isFree
+                  ? 'var(--yellow)'
+                  : marked
+                    ? accent
+                    : '#F1E9F4',
+              }}
+            >
+              {isFree ? 'FREE' : cellTerm(rival, cell, free)}
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function GamePlayOverlay({
+  winner,
+  winnerName,
+  boardName,
+  isMe,
+  myName,
+  onExit,
+}: {
+  winner: GameWinner
+  winnerName: string
+  boardName: string
+  isMe: boolean
+  myName: string
+  onExit: () => void
+}) {
+  if (!isMe) {
+    return (
+      <div className={styles.overlay}>
+        <div className={styles.loseCard}>
+          <h2 className={styles.loseTitle}>You Lose! 💀</h2>
+          <p className={styles.loseSub}>
+            {winnerName} hit a {WIN_PHRASE[winner.pattern]} on {boardName}.
+          </p>
+          <button className={styles.overlayCta} type="button" onClick={onExit}>
+            Return to the archive
+          </button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className={styles.overlay}>
+      {CONFETTI.map((c, i) => (
+        <span
+          key={i}
+          className={styles.confetti}
+          style={{
+            left: `${c.left}%`,
+            background: c.color,
+            animationDelay: `${c.delay}s`,
+            animationDuration: `${c.duration}s`,
+          }}
+          aria-hidden
+        />
+      ))}
+      <div className={styles.winCard}>
+        <span className={styles.winBadge}>{WIN_BADGE[winner.pattern]}</span>
+        <h2 className={styles.bingo}>BINGO!</h2>
+        <p className={styles.winSub}>
+          {myName} wins. Crowd goes wild. (Try to be humble about it.)
+        </p>
+        <button className={styles.overlayCta} type="button" onClick={onExit}>
+          Back to the archive
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function GamePlayPage({ room }: { room: GameRoomView }) {
+  const navigate = useNavigate()
+  const { player } = useSession()
+  const [soundOn, setSoundOn] = useState(true)
+  const [peekId, setPeekId] = useState<string | null>(null)
+  const [chatDraft, setChatDraft] = useState('')
+  const chatListRef = useRef<HTMLDivElement>(null)
+  const chatCount = room.chat.length
+
+  useEffect(() => {
+    const el = chatListRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [chatCount])
+
+  if (!player) return null
+  const { state } = room
+  const me = state.players.find((p) => p.player.id === player.id)
+  if (!me) return null
+
+  const size = state.board.size
+  const free = freeIndex(size)
+  const finished = state.status === 'finished'
+  const winner = state.winner
+  const rivals = state.players.filter((p) => p.player.id !== player.id)
+  const peeked = rivals.find((r) => r.player.id === peekId) ?? null
+  const online = state.players.filter((p) => p.connected).length
+  const winnerName = winner
+    ? (state.players.find((p) => p.player.id === winner.playerId)?.player
+        .name ?? 'Someone')
+    : ''
+
+  const handleCell = (cell: number) => {
+    const isMarked = me.marks.includes(cell)
+    if (!isMarked && soundOn) playPop()
+    // The server is the referee — a rejected mark just means the next state
+    // broadcast wins, so error strings are dropped on the floor.
+    void room.mark(cell, !isMarked)
+  }
+
+  function handleChatSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!chatDraft.trim()) return
+    room.sendChat(chatDraft)
+    setChatDraft('')
+  }
+
+  return (
+    <>
+      <header className={styles.header}>
+        <button
+          className={styles.back}
+          type="button"
+          aria-label="Back to the archive"
+          onClick={() => navigate('/boards')}
+        >
+          ←
+        </button>
+        <div>
+          <h1 className={styles.boardName}>{state.board.name}</h1>
+          <p className={styles.subline}>
+            ROUND 1 · {state.players.length} PLAYERS · WINS: ROW / COL / DIAG /
+            BLACKOUT
+          </p>
+        </div>
+        <div className={styles.headerRight}>
+          <button
+            className={soundOn ? styles.soundOn : styles.soundOff}
+            type="button"
+            aria-pressed={soundOn}
+            onClick={() => setSoundOn((was) => !was)}
+          >
+            {soundOn ? '🔊 SOUND ON' : '🔇 SOUND OFF'}
+          </button>
+          <button
+            className={styles.rageQuit}
+            type="button"
+            onClick={() => navigate('/boards')}
+          >
+            RAGE QUIT
+          </button>
+          <span className={styles.chip}>
+            <span
+              className={styles.avatar}
+              style={{ background: accentFor(player.id) }}
+            >
+              {player.name[0]?.toUpperCase()}
+            </span>
+            {player.name}
+          </span>
+        </div>
+      </header>
+      <main className={styles.body}>
+        <section className={styles.main}>
+          <div className={styles.cardLabelRow}>
+            <p className={styles.cardLabel}>YOUR CARD</p>
+            <span className={styles.shuffledPill}>SHUFFLED JUST FOR YOU</span>
+          </div>
+          <div
+            className={styles.card}
+            role="group"
+            aria-label="Your card"
+            style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+          >
+            {Array.from({ length: size * size }, (_, cell) => {
+              const isFree = cell === free
+              const marked = isFree || me.marks.includes(cell)
+              const inLine =
+                finished && winner !== null && winner.line.includes(cell)
+              const classes = [
+                styles.cell,
+                marked && styles.cellMarked,
+                isFree && styles.cellFree,
+                inLine && styles.cellWinning,
+              ]
+              return (
+                <button
+                  key={cell}
+                  type="button"
+                  className={classes.filter(Boolean).join(' ')}
+                  aria-pressed={marked}
+                  disabled={isFree || finished}
+                  onClick={() => handleCell(cell)}
+                >
+                  {isFree ? (
+                    <>
+                      <span className={styles.freeStar} aria-hidden>
+                        ★
+                      </span>
+                      FREE
+                    </>
+                  ) : (
+                    cellTerm(me, cell, free)
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+        <aside className={styles.rail}>
+          <p className={styles.rivalsLabel}>
+            <span className={styles.liveDot} aria-hidden />
+            THE COMPETITION — LIVE
+          </p>
+          <div className={styles.rivalsGrid}>
+            {rivals.map((rival) => (
+              <GamePlayRival
+                key={rival.player.id}
+                rival={rival}
+                size={size}
+                onPeek={() => setPeekId(rival.player.id)}
+              />
+            ))}
+          </div>
+          {peeked && (
+            <GamePlayPeek
+              rival={peeked}
+              size={size}
+              onClose={() => setPeekId(null)}
+            />
+          )}
+          <p className={styles.peekHint}>
+            click a rival's board to peek at their card
+          </p>
+          <div className={styles.chat}>
+            <div className={styles.chatHeader}>
+              TRASH TALK
+              <span className={styles.onlinePill}>{online} online</span>
+            </div>
+            <div className={styles.chatList} ref={chatListRef}>
+              {room.chat.map((m, i) => (
+                <div key={`${m.at}-${i}`} className={styles.chatMessage}>
+                  <span
+                    className={styles.avatar}
+                    style={{ background: accentFor(m.player.id) }}
+                  >
+                    {m.player.name[0]?.toUpperCase()}
+                  </span>
+                  <p className={styles.chatBody}>
+                    <strong className={styles.chatName}>
+                      {m.player.name}
+                    </strong>{' '}
+                    {m.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <form className={styles.chatInputRow} onSubmit={handleChatSubmit}>
+              <input
+                className={styles.chatInput}
+                placeholder="say something spicy…"
+                value={chatDraft}
+                onChange={(e) => setChatDraft(e.target.value)}
+              />
+              <button className={styles.chatSend} type="submit" aria-label="Send">
+                →
+              </button>
+            </form>
+          </div>
+        </aside>
+      </main>
+      {finished && winner && (
+        <GamePlayOverlay
+          winner={winner}
+          winnerName={winnerName}
+          boardName={state.board.name}
+          isMe={winner.playerId === player.id}
+          myName={player.name}
+          onExit={() => navigate('/boards')}
+        />
+      )}
+    </>
   )
 }
