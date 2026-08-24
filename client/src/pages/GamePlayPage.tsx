@@ -64,7 +64,7 @@ function GamePlayRival({
     <button className={styles.rival} type="button" onClick={onPeek}>
       <span
         className={styles.rivalGrid}
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
         aria-hidden
       >
         {Array.from({ length: size * size }, (_, cell) => (
@@ -118,7 +118,7 @@ function GamePlayPeek({
       </p>
       <div
         className={styles.peekGrid}
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: size * size }, (_, cell) => {
           const isFree = cell === free
@@ -241,7 +241,7 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
             className={styles.card}
             role="group"
             aria-label="Your card"
-            style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+            style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
           >
             {Array.from({ length: size * size }, (_, cell) => {
               const isFree = cell === free

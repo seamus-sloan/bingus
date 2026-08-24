@@ -249,3 +249,9 @@
   margin: 36px auto 0;
   max-width: 62ch;
 }
+
+@media (max-width: 640px) {
+  .main {
+    padding: 24px 18px;
+  }
+}

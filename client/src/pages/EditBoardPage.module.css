@@ -32,3 +32,9 @@
   translate: 2px 2px;
   box-shadow: 2px 2px 0 rgba(43, 27, 51, 0.2);
 }
+
+@media (max-width: 640px) {
+  .statusMain {
+    padding: 24px 18px;
+  }
+}

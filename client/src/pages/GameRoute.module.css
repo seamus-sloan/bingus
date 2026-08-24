@@ -32,3 +32,9 @@
   translate: 2px 2px;
   box-shadow: 2px 2px 0 var(--ink);
 }
+
+@media (max-width: 640px) {
+  .main {
+    padding: 24px 18px;
+  }
+}
