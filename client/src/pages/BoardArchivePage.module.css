@@ -408,3 +408,9 @@
   font-size: 14px;
   z-index: 40;
 }
+
+@media (max-width: 640px) {
+  .main {
+    padding: 24px 18px;
+  }
+}

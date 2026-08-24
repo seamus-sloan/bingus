@@ -590,3 +590,17 @@
   color: var(--yellow);
   margin: 14px 0 0;
 }
+
+@media (max-width: 560px) {
+  .winScreen {
+    padding: 32px 16px;
+  }
+
+  .bingo {
+    letter-spacing: -3px;
+  }
+
+  .winSub {
+    font-size: 18px;
+  }
+}

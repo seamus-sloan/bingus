@@ -194,7 +194,7 @@ export function BoardForm({
         <div
           className={styles.previewCard}
           data-testid="board-preview"
-          style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+          style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
         >
           {Array.from({ length: size * size }, (_, i) => {
             if (i === center) {

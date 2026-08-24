@@ -150,7 +150,7 @@ function WinScreen({
           className={styles.winCard}
           role="group"
           aria-label="Your winning card"
-          style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+          style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
         >
           {Array.from({ length: size * size }, (_, cell) => {
             const isFree = cell === free
@@ -234,7 +234,7 @@ function RestBoard({
     >
       <span
         className={styles.restBoard}
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
         aria-hidden
       >
         {Array.from({ length: size * size }, (_, cell) => (
@@ -300,7 +300,7 @@ function PeekCard({
         </div>
         <div
           className={styles.peekGrid}
-          style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+          style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
         >
           {Array.from({ length: size * size }, (_, cell) => {
             const isFree = cell === free
@@ -384,7 +384,7 @@ function LoseScreen({
                 ))}
                 <div
                   className={styles.winnerGrid}
-                  style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+                  style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
                 >
                   {Array.from({ length: size * size }, (_, cell) => {
                     const isFree = cell === free

@@ -15,8 +15,11 @@
 }
 
 .card {
-  width: 520px;
-  max-width: 100%;
+  /* width (not max-width) inside a place-items grid would size the implicit
+     track to 520px and overflow narrow screens — the % then resolves against
+     the track, not the viewport. */
+  width: 100%;
+  max-width: 520px;
   background: #fff;
   border: 3px solid var(--ink);
   border-radius: 28px;
@@ -147,4 +150,27 @@
 
 .arrow {
   font-size: 20px;
+}
+
+@media (max-width: 560px) {
+  .screen {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 32px 22px;
+  }
+
+  .wordmark {
+    font-size: clamp(42px, 14vw, 64px);
+  }
+
+  .logoDot {
+    width: 44px;
+    height: 44px;
+  }
+
+  .tagline {
+    font-size: 15px;
+  }
 }

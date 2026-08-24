@@ -310,3 +310,27 @@
   max-width: 38ch;
   margin: 18px 6px 0;
 }
+
+@media (max-width: 640px) {
+  .main {
+    padding: 24px 18px;
+    gap: 32px;
+  }
+
+  .title {
+    font-size: clamp(30px, 9.5vw, 44px);
+  }
+
+  .sizes {
+    gap: 8px;
+  }
+
+  .sizeCard,
+  .sizeCardSelected {
+    padding: 10px 10px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+}
