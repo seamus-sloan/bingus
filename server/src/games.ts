@@ -16,6 +16,11 @@ import {
 
 const CHAT_BACKLOG = 100;
 
+// How long an empty room lingers before sweep re-checks it (see
+// GameManager.scheduleSweep). Long enough to ride out any leave→rejoin
+// flicker; short enough that a dead lobby doesn't haunt the live-tables list.
+const SWEEP_GRACE_MS = 10_000;
+
 interface PlayerState {
   player: Player;
   card: string[]; // board terms in this player's order (FREE tile omitted)
@@ -267,6 +272,19 @@ export class GameManager {
     if (!room) return;
     const done = room.status === "finished" && room.empty;
     if (done || room.abandoned) this.games.delete(code);
+  }
+
+  /**
+   * Sweep after a grace period instead of instantly. A leave immediately
+   * followed by a rejoin on the same socket — React StrictMode's dev-mode
+   * effect replay, or a reconnect blip — must not destroy a room the player
+   * is about to re-enter: the sweep re-checks its conditions when the timer
+   * fires, so a re-seated room survives untouched.
+   */
+  scheduleSweep(code: string, delayMs = SWEEP_GRACE_MS): void {
+    const timer = setTimeout(() => this.sweep(code), delayMs);
+    // Don't let a pending sweep hold the process open.
+    timer.unref?.();
   }
 
   liveCount(): number {

@@ -70,7 +70,10 @@ export function attachSocket(
       );
       if (!stillHere) room.disconnect(socket.data.player.id);
       broadcast(code);
-      deps.games.sweep(code);
+      // Grace-delayed: an instant sweep here races the leave→rejoin flicker
+      // that StrictMode remounts (and reconnect blips) produce, deleting a
+      // lobby milliseconds before its player rejoins it.
+      deps.games.scheduleSweep(code);
     };
 
     socket.on("game:join", (code, ack) => {
