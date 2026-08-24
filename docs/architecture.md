@@ -32,7 +32,7 @@ Current endpoints:
 - `GET /api/stats` — Home-screen numbers (player and board counts are live; liveGames stays 0 until game tables exist).
 - `GET /api/boards?search=&limit=&offset=` — browse the board archive, newest first; `search` filters by name (case-insensitive), `limit` caps at 50.
 - `POST /api/boards` — print a fresh board. A board is a **word bank**, not a fixed card: the shared schema validates that it holds at least `size² - 1` terms (the card's tile count — one tile is FREE at `freeIndex(size)`), at most `BOARD_TERMS_MAX` (200), and no duplicates; `400 invalid_board` with a message on failure. Anything above the minimum is depth the deal draws from.
-- `GET /api/boards/:id` / `PATCH /api/boards/:id` / `DELETE /api/boards/:id` — fetch one board / edit it / permanently delete it (edit and delete are creator-only, `403 unauthorized` otherwise).
+- `GET /api/boards/:id` / `PATCH /api/boards/:id` / `DELETE /api/boards/:id` — fetch one board / edit it / permanently delete it. The archive is a shared shelf: **any** signed-in player may edit **any** board. Delete stays creator-only (`403 unauthorized` otherwise) — an unwanted edit is recoverable by editing back, a delete takes the board out from under anyone mid-game with it.
 - `POST /api/games` — open a live table for a board. Returns the join code (`BNGS-nnn`); everything after creation happens over the socket.
 - `GET /api/games` — list joinable tables (lobby + playing, newest first) for the Live Tables screen, which polls it every 5s.
 

@@ -372,7 +372,7 @@ describe("board editing", () => {
     );
   });
 
-  it("lets the creator edit their board", async () => {
+  it("lets a player edit their own board", async () => {
     const { cookie } = await signIn("Ruth");
     const created = await createBoard(cookie);
     const res = await app.request(`/api/boards/${created.body.board.id}`, {
@@ -390,16 +390,33 @@ describe("board editing", () => {
     expect(body.board.terms).toEqual(TERMS8.map((t) => t + "!"));
   });
 
-  it("refuses edits from anyone but the creator", async () => {
+  it("lets any signed-in player edit someone else's board", async () => {
     const ruth = await signIn("Ruth");
     const created = await createBoard(ruth.cookie);
     const priya = await signIn("Priya");
     const res = await app.request(`/api/boards/${created.body.board.id}`, {
       method: "PATCH",
       headers: { Cookie: priya.cookie },
+      body: JSON.stringify({ name: "Standup Standoff 2", size: 3, terms: TERMS8 }),
+    });
+    expect(res.status).toBe(200);
+    expect(
+      ((await res.json()) as Body<CreateBoardResponse>).board.name,
+    ).toBe("Standup Standoff 2");
+    // Editing doesn't transfer the board — Ruth still owns (and can delete) it.
+    const listed = await listBoards(priya.cookie);
+    expect(listed.body.boards[0].createdBy).toBe("Ruth");
+  });
+
+  it("still refuses edits from a caller with no session", async () => {
+    const ruth = await signIn("Ruth");
+    const created = await createBoard(ruth.cookie);
+    const res = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "PATCH",
+      headers: { Cookie: `${SESSION_COOKIE}=bogus` },
       body: JSON.stringify({ name: "Hijacked", size: 3, terms: TERMS8 }),
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(((await res.json()) as ApiError).code).toBe("unauthorized");
   });
 

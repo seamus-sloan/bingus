@@ -27,7 +27,8 @@ export type Player = z.infer<typeof PlayerSchema>;
 // GET  /api/boards?search=&limit=&offset= — browse the archive (newest first).
 // POST /api/boards — print a fresh board (requires a session).
 // GET  /api/boards/:id — fetch one board.
-// PATCH /api/boards/:id — edit a board you created (same shape as create).
+// PATCH /api/boards/:id — edit any board (same shape as create). The archive
+//   is a shared shelf: every signed-in player may improve someone else's board.
 // DELETE /api/boards/:id — permanently delete a board you created.
 
 export const BOARD_SIZES = [3, 4, 5] as const;
@@ -109,8 +110,8 @@ export type CreateBoardRequest = z.infer<typeof CreateBoardRequestSchema>;
 export const CreateBoardResponseSchema = z.object({ board: BoardSchema });
 export type CreateBoardResponse = z.infer<typeof CreateBoardResponseSchema>;
 
-// Editing reuses the create shape wholesale; the server additionally checks
-// that the editor is the board's creator.
+// Editing reuses the create shape wholesale — any signed-in player may edit
+// any board, so the only extra server check is that the board exists.
 export const UpdateBoardRequestSchema = CreateBoardRequestSchema;
 export type UpdateBoardRequest = CreateBoardRequest;
 

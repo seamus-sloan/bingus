@@ -93,23 +93,21 @@ function BoardArchiveCard({
   const accent = CANDY[hashId(board.id) % CANDY.length]
   return (
     <article className={styles.card}>
-      {/* The action icons live in the upper-right, so a card that is both
-          new and yours hangs its NEW ribbon on the left instead. */}
-      {isNew && (
-        <span className={isMine ? styles.newRibbonLeft : styles.newRibbon}>
-          NEW
-        </span>
-      )}
-      {isMine && (
-        <div className={styles.cardActions}>
-          <button
-            className={styles.iconButton}
-            type="button"
-            aria-label="Edit board"
-            onClick={onEdit}
-          >
-            ✎
-          </button>
+      {/* Every card carries an action cluster in the upper-right, so the NEW
+          ribbon always hangs on the left rather than colliding with it. */}
+      {isNew && <span className={styles.newRibbonLeft}>NEW</span>}
+      <div className={styles.cardActions}>
+        {/* The archive is a shared shelf — anyone may edit any board. Only
+            the player who printed it can take it off the shelf. */}
+        <button
+          className={styles.iconButton}
+          type="button"
+          aria-label="Edit board"
+          onClick={onEdit}
+        >
+          ✎
+        </button>
+        {isMine && (
           <button
             className={styles.iconButton}
             type="button"
@@ -118,8 +116,8 @@ function BoardArchiveCard({
           >
             🗑
           </button>
-        </div>
-      )}
+        )}
+      </div>
       <BoardArchivePreview board={board} />
       <h3 className={styles.cardName}>{board.name}</h3>
       <p className={styles.cardBy}>

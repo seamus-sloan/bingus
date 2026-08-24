@@ -128,7 +128,6 @@
   padding: 22px;
 }
 
-.newRibbon,
 .newRibbonLeft {
   position: absolute;
   top: -12px;
@@ -143,13 +142,8 @@
   box-shadow: 3px 3px 0 var(--ink);
 }
 
-.newRibbon {
-  right: 16px;
-  transform: rotate(3deg);
-}
-
-/* On the player's own cards the action icons take the upper-right, so the
-   ribbon swings to the left edge instead of colliding with them. */
+/* The action icons take the upper-right of every card, so the ribbon sits on
+   the left edge instead of colliding with them. */
 .newRibbonLeft {
   left: 16px;
   transform: rotate(-3deg);

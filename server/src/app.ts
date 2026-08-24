@@ -149,20 +149,15 @@ export function createApp(
     return c.json({ board: found.board } satisfies GetBoardResponse);
   });
 
+  // The archive is a shared shelf: any signed-in player may edit any board,
+  // the way a wiki page is everyone's to improve. Deleting one still belongs
+  // to whoever printed it — an edit is recoverable by editing back, a delete
+  // takes the board out from under anyone mid-game with it.
   app.patch("/api/boards/:id", async (c) => {
     const me = requireActive(c);
     if (me instanceof Response) return me;
     const found = boards.get(c.req.param("id"));
     if (!found) return c.json(boardNotFound(), 404);
-    if (found.createdById !== me.player.id) {
-      return c.json(
-        {
-          code: "unauthorized",
-          error: "Only the board's creator can edit it.",
-        } satisfies ApiError,
-        403,
-      );
-    }
     const body = UpdateBoardRequestSchema.safeParse(
       await c.req.json().catch(() => null),
     );
