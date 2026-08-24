@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Hono } from "hono";
+import { BOARD_TERMS_MAX } from "@bingus/shared";
 import type {
   ApiError,
   Board,
@@ -371,7 +372,7 @@ describe("board editing", () => {
     );
   });
 
-  it("lets the creator edit their board", async () => {
+  it("lets a player edit their own board", async () => {
     const { cookie } = await signIn("Ruth");
     const created = await createBoard(cookie);
     const res = await app.request(`/api/boards/${created.body.board.id}`, {
@@ -389,16 +390,33 @@ describe("board editing", () => {
     expect(body.board.terms).toEqual(TERMS8.map((t) => t + "!"));
   });
 
-  it("refuses edits from anyone but the creator", async () => {
+  it("lets any signed-in player edit someone else's board", async () => {
     const ruth = await signIn("Ruth");
     const created = await createBoard(ruth.cookie);
     const priya = await signIn("Priya");
     const res = await app.request(`/api/boards/${created.body.board.id}`, {
       method: "PATCH",
       headers: { Cookie: priya.cookie },
+      body: JSON.stringify({ name: "Standup Standoff 2", size: 3, terms: TERMS8 }),
+    });
+    expect(res.status).toBe(200);
+    expect(
+      ((await res.json()) as Body<CreateBoardResponse>).board.name,
+    ).toBe("Standup Standoff 2");
+    // Editing doesn't transfer the board — Ruth still owns (and can delete) it.
+    const listed = await listBoards(priya.cookie);
+    expect(listed.body.boards[0].createdBy).toBe("Ruth");
+  });
+
+  it("still refuses edits from a caller with no session", async () => {
+    const ruth = await signIn("Ruth");
+    const created = await createBoard(ruth.cookie);
+    const res = await app.request(`/api/boards/${created.body.board.id}`, {
+      method: "PATCH",
+      headers: { Cookie: `${SESSION_COOKIE}=bogus` },
       body: JSON.stringify({ name: "Hijacked", size: 3, terms: TERMS8 }),
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(((await res.json()) as ApiError).code).toBe("unauthorized");
   });
 
@@ -543,9 +561,28 @@ describe("boards", () => {
     expect(list.status).toBe(401);
   });
 
-  it("rejects a term count that does not match the size", async () => {
+  it("rejects a word bank too small to fill a card", async () => {
     const { cookie } = await signIn("Ruth");
     const created = await createBoard(cookie, { size: 5 });
+    expect(created.status).toBe(400);
+    expect(created.body.code).toBe("invalid_board");
+  });
+
+  it("accepts a word bank deeper than the card", async () => {
+    const { cookie } = await signIn("Ruth");
+    const terms = Array.from({ length: 40 }, (_, i) => `term ${i}`);
+    const created = await createBoard(cookie, { size: 3, terms });
+    expect(created.status).toBe(201);
+    expect(created.body.board.terms).toHaveLength(40);
+  });
+
+  it("rejects a word bank over the cap", async () => {
+    const { cookie } = await signIn("Ruth");
+    const terms = Array.from(
+      { length: BOARD_TERMS_MAX + 1 },
+      (_, i) => `term ${i}`,
+    );
+    const created = await createBoard(cookie, { size: 3, terms });
     expect(created.status).toBe(400);
     expect(created.body.code).toBe("invalid_board");
   });

@@ -105,7 +105,7 @@ describe('edit board page', () => {
       (screen.getByLabelText('BOARD NAME') as HTMLInputElement).value,
     ).toBe('Retro Bingo')
     expect(
-      (screen.getByLabelText('YOUR TERMS — ONE PER LINE') as HTMLTextAreaElement)
+      (screen.getByLabelText('YOUR WORD BANK — ONE PER LINE') as HTMLTextAreaElement)
         .value,
     ).toBe(TERMS_8.join('\n'))
     // The board's size arrives selected.
@@ -155,19 +155,19 @@ describe('edit board page', () => {
     })
   })
 
-  it('surfaces a 403 ApiError in the alert area', async () => {
+  it('surfaces a server ApiError in the alert area', async () => {
     mockApi({
-      patchStatus: 403,
+      patchStatus: 400,
       patchBody: {
-        code: 'unauthorized',
-        error: 'Only the creator can reprint this board.',
+        code: 'invalid_board',
+        error: 'That edit won\'t print.',
       },
     })
     renderPage()
     await screen.findByRole('heading', { name: 'Reprint Retro Bingo' })
     fireEvent.click(screen.getByRole('button', { name: 'Reprint it ✓' }))
     expect((await screen.findByRole('alert')).textContent).toContain(
-      'Only the creator',
+      "That edit won't print.",
     )
   })
 })

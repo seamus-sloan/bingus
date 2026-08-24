@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { BOARD_TERMS_MAX } from '@bingus/shared'
 import { SessionProvider } from '../lib/session'
 import { CreateBoardPage } from './CreateBoardPage'
 
@@ -56,7 +57,7 @@ function renderPage() {
   )
 }
 
-const TERMS_LABEL = 'YOUR TERMS — ONE PER LINE'
+const TERMS_LABEL = 'YOUR WORD BANK — ONE PER LINE'
 const TERMS_8 = [
   'synergy',
   'circle back',
@@ -78,6 +79,11 @@ function fillTerms(lines: string[]) {
   fireEvent.change(screen.getByLabelText(TERMS_LABEL), {
     target: { value: lines.join('\n') },
   })
+}
+
+/** A bank of `n` distinct terms, for the depth and cap cases. */
+function bank(n: number): string[] {
+  return Array.from({ length: n }, (_, i) => `term ${i}`)
 }
 
 function previewCells(): HTMLElement[] {
@@ -104,7 +110,7 @@ describe('create board page', () => {
     expect(previewCells()).toHaveLength(16)
   })
 
-  it('keeps submit disabled until name and exact term count are present', () => {
+  it('keeps submit disabled until a name and a card\'s worth of terms are in', () => {
     mockApi()
     renderPage()
     const submit = () =>
@@ -117,7 +123,10 @@ describe('create board page', () => {
     expect(submit().disabled).toBe(true)
     fillTerms(TERMS_8)
     expect(submit().disabled).toBe(false)
-    fillTerms([...TERMS_8, 'one too many'])
+    // Past the card's tile count is depth, not an error — only the cap bites.
+    fillTerms(bank(40))
+    expect(submit().disabled).toBe(false)
+    fillTerms(bank(BOARD_TERMS_MAX + 1))
     expect(submit().disabled).toBe(true)
   })
 
@@ -144,7 +153,7 @@ describe('create board page', () => {
     ).toBe(false)
   })
 
-  it('counts the term gap in the still-needed line, both short and over', () => {
+  it('counts the term gap in the still-needed line, both short and over cap', () => {
     mockApi()
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: /3×3/ }))
@@ -153,8 +162,22 @@ describe('create board page', () => {
     expect(screen.getByText('Still needed: 3 more terms')).toBeDefined()
     fillTerms(TERMS_8.slice(0, 7))
     expect(screen.getByText('Still needed: 1 more term')).toBeDefined()
-    fillTerms([...TERMS_8, 'one too many'])
-    expect(screen.getByText('Still needed: 1 too many terms')).toBeDefined()
+    fillTerms(bank(40))
+    expect(screen.queryByText(/Still needed/)).toBeNull()
+    fillTerms(bank(BOARD_TERMS_MAX + 2))
+    expect(screen.getByText('Still needed: 2 terms over the cap')).toBeDefined()
+  })
+
+  it('reframes the preview caption once the bank runs deeper than a card', () => {
+    mockApi()
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /3×3/ }))
+    fillTerms(TERMS_8)
+    expect(screen.getByText(/these same 8 terms in a different order/)).toBeDefined()
+    fillTerms(bank(40))
+    expect(
+      screen.getByText(/One of many 8-tile hands off a 40-term bank/),
+    ).toBeDefined()
   })
 
   it('fills the preview in order with FREE at the center', () => {

@@ -7,8 +7,8 @@ import { BoardForm } from './BoardForm'
 import styles from './EditBoardPage.module.css'
 
 // Reprint an existing board: fetch it, prefill the shared BoardForm, and
-// PATCH the whole shape back. The server rejects editors who aren't the
-// creator (403), which lands in the form's alert slot like any ApiError.
+// PATCH the whole shape back. Any signed-in player may edit any board, so the
+// only failure the server raises here is a board that isn't in the archive.
 export function EditBoardPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()

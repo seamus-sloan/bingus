@@ -217,14 +217,19 @@ describe('board archive', () => {
     ).toBeDefined()
   })
 
-  it('shows the edit and delete icons only on the signed-in player’s own boards', async () => {
+  it('shows the edit icon on every board — the archive is a shared shelf', async () => {
     mockApi([makeBoard(1), makeBoard(2, { createdBy: 'Ruth' })])
     renderArchive()
-    // /api/me resolves Ruth, so only board 2 carries the action icons.
-    const edit = await screen.findByRole('button', { name: 'Edit board' })
-    expect(edit.closest('article')?.textContent).toContain('Board 2')
-    expect(screen.getAllByRole('button', { name: 'Edit board' })).toHaveLength(1)
-    const del = screen.getByRole('button', { name: 'Delete board' })
+    await screen.findByText('Board 1')
+    expect(screen.getAllByRole('button', { name: 'Edit board' })).toHaveLength(2)
+  })
+
+  it('shows the delete icon only on the signed-in player’s own boards', async () => {
+    mockApi([makeBoard(1), makeBoard(2, { createdBy: 'Ruth' })])
+    renderArchive()
+    // /api/me resolves Ruth, so only board 2 can be taken off the shelf.
+    const del = await screen.findByRole('button', { name: 'Delete board' })
+    expect(screen.getAllByRole('button', { name: 'Delete board' })).toHaveLength(1)
     expect(del.closest('article')?.textContent).toContain('Board 2')
   })
 
