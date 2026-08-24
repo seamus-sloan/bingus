@@ -38,6 +38,8 @@ export function attachSocket(
       ?.slice(SESSION_COOKIE.length + 1);
     const me = token ? deps.players.getByToken(token) : undefined;
     if (!me) return next(new Error("unauthorized"));
+    // Same reset gate as REST: no realtime play until a real password is set.
+    if (me.needsPasswordReset) return next(new Error("password_reset_required"));
     socket.data.player = me.player;
     socket.data.gameCode = null;
     next();

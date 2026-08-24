@@ -2,7 +2,9 @@
 
 Multiplayer bingo with friends. And trash talk.
 
-Players sign in with just a name, pick a bingo board from the archive (or print a fresh one), and play live against friends — everyone gets the same terms shuffled into their own card, marks their own tiles, and races to a row, column, diagonal, or blackout. Game chat included for the banter.
+Players log in with a name and password, pick a bingo board from the archive (or print a fresh one), and play live against friends — everyone gets the same terms shuffled into their own card, marks their own tiles, and races to a row, column, diagonal, or blackout. Game chat included for the banter.
+
+There's no public sign-up: an admin creates each account, which mints a one-time code the new player uses as their first password — their first login walks them into choosing a real one. (Dev tip: run the server with `BINGUS_ADMIN=<name>` and the first boot prints that admin's one-time code.)
 
 ## Stack
 
@@ -52,6 +54,8 @@ docker compose up -d
 ```
 
 pulls `sesloan/bingus:latest` (multi-arch: amd64 + arm64) and serves on
-`http://<host>:3000`. See [docker-compose.yml](docker-compose.yml) for the
-volume and PUID/PGID knobs, and [docs/architecture.md](docs/architecture.md)
-for the release pipeline that publishes the image.
+`http://<host>:3000`. The first boot prints the admin's one-time login code
+to the container logs. See [docker-compose.yml](docker-compose.yml) for the
+volume, PUID/PGID, `BINGUS_ADMIN`, and `BINGUS_SECURE_COOKIES` knobs, and
+[docs/architecture.md](docs/architecture.md) for the release pipeline that
+publishes the image.

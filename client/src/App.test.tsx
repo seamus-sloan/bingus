@@ -14,33 +14,53 @@ function jsonResponse(status: number, body: unknown) {
 const unauthorized = { code: 'unauthorized', error: 'No seat at the table.' }
 
 // Route the fetch mock the way the server would respond. `me` is the player
-// the session cookie resolves to (null = signed out / ghost session).
+// the session cookie resolves to (null = signed out / ghost session); the
+// flags ride the same /api/me body the way the server sends them.
 function mockApi({
   me = null,
+  needsPasswordReset = false,
+  isAdmin = false,
   stats = { players: 5, boards: 0, liveGames: 0 },
-  createStatus = 201,
-  createBody = null,
+  loginStatus = 200,
+  loginBody = null,
+  setPasswordBody = null,
   renamed = null,
+  roster = [],
 }: {
   me?: Player | null
+  needsPasswordReset?: boolean
+  isAdmin?: boolean
   stats?: { players: number; boards: number; liveGames: number }
-  createStatus?: number
-  createBody?: unknown
+  loginStatus?: number
+  loginBody?: unknown
+  setPasswordBody?: unknown
   renamed?: Player | null
+  roster?: unknown[]
 } = {}) {
   const fetchMock = vi.fn().mockImplementation(
     (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
       if (url === '/api/me' && method === 'GET') {
         return Promise.resolve(
-          me ? jsonResponse(200, { player: me }) : jsonResponse(401, unauthorized),
+          me
+            ? jsonResponse(200, { player: me, needsPasswordReset, isAdmin })
+            : jsonResponse(401, unauthorized),
         )
       }
       if (url === '/api/me' && method === 'PATCH') {
         return Promise.resolve(jsonResponse(200, { player: renamed }))
       }
-      if (url === '/api/players' && method === 'POST') {
-        return Promise.resolve(jsonResponse(createStatus, createBody))
+      if (url === '/api/login' && method === 'POST') {
+        return Promise.resolve(jsonResponse(loginStatus, loginBody))
+      }
+      if (url === '/api/logout' && method === 'POST') {
+        return Promise.resolve(jsonResponse(200, { ok: true }))
+      }
+      if (url === '/api/me/password' && method === 'POST') {
+        return Promise.resolve(jsonResponse(200, setPasswordBody))
+      }
+      if (url === '/api/players' && method === 'GET') {
+        return Promise.resolve(jsonResponse(200, { players: roster }))
       }
       if (url === '/api/stats') {
         return Promise.resolve(jsonResponse(200, stats))
@@ -55,6 +75,16 @@ function mockApi({
   return fetchMock
 }
 
+async function fillLogin(name: string, password: string) {
+  fireEvent.change(await screen.findByLabelText('YOUR NAME'), {
+    target: { value: name },
+  })
+  fireEvent.change(screen.getByLabelText('CODE OR PASSWORD'), {
+    target: { value: password },
+  })
+  fireEvent.click(screen.getByRole('button', { name: /Let's play/ }))
+}
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -63,10 +93,11 @@ afterEach(() => {
 })
 
 describe('session gate', () => {
-  it('shows the sign-in screen when /api/me says there is no session', async () => {
+  it('shows the login screen when /api/me says there is no session', async () => {
     mockApi({ me: null })
     render(<App />)
     expect(await screen.findByLabelText('YOUR NAME')).toBeDefined()
+    expect(screen.getByLabelText('CODE OR PASSWORD')).toBeDefined()
   })
 
   it('restores a valid session straight to home', async () => {
@@ -76,9 +107,9 @@ describe('session gate', () => {
     expect(screen.queryByLabelText('YOUR NAME')).toBeNull()
   })
 
-  it('kicks a ghost session back to sign-in', async () => {
+  it('kicks a ghost session back to the login screen', async () => {
     // The cookie may exist in the browser, but the server no longer knows the
-    // player — /api/me 401s and the only screen offered is sign-in.
+    // player — /api/me 401s and the only screen offered is login.
     mockApi({ me: null })
     render(<App />)
     expect(await screen.findByLabelText('YOUR NAME')).toBeDefined()
@@ -86,35 +117,143 @@ describe('session gate', () => {
   })
 })
 
-describe('sign-in flow', () => {
-  it('signs in and lands on home with the profile chip', async () => {
+describe('login flow', () => {
+  it('logs in and lands on home with the profile chip', async () => {
     mockApi({
       me: null,
-      createBody: { player: { id: 'p1', name: 'Ruth' } },
-    })
-    render(<App />)
-    fireEvent.change(await screen.findByLabelText('YOUR NAME'), {
-      target: { value: 'Ruth' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /Let's play/ }))
-    expect(await screen.findByRole('button', { name: /Ruth/ })).toBeDefined()
-  })
-
-  it('surfaces a name-taken error from the server', async () => {
-    mockApi({
-      me: null,
-      createStatus: 409,
-      createBody: {
-        code: 'name_taken',
-        error: '"Ruth" is taken. Choose more wisely.',
+      loginBody: {
+        player: { id: 'p1', name: 'Ruth' },
+        needsPasswordReset: false,
+        isAdmin: false,
       },
     })
     render(<App />)
-    fireEvent.change(await screen.findByLabelText('YOUR NAME'), {
-      target: { value: 'Ruth' },
+    await fillLogin('Ruth', 'hunter22well')
+    expect(await screen.findByRole('button', { name: /Ruth/ })).toBeDefined()
+  })
+
+  it('surfaces bad credentials from the server', async () => {
+    mockApi({
+      me: null,
+      loginStatus: 401,
+      loginBody: {
+        code: 'invalid_credentials',
+        error: "Name and code/password don't match.",
+      },
     })
-    fireEvent.click(screen.getByRole('button', { name: /Let's play/ }))
-    expect((await screen.findByRole('alert')).textContent).toContain('taken')
+    render(<App />)
+    await fillLogin('Ruth', 'wrong-guess')
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      "don't match",
+    )
+  })
+
+  it('logging in with a one-time code lands on the set-password screen', async () => {
+    mockApi({
+      me: null,
+      loginBody: {
+        player: { id: 'p1', name: 'Ruth' },
+        needsPasswordReset: true,
+        isAdmin: false,
+      },
+    })
+    render(<App />)
+    await fillLogin('Ruth', 'ABCD-EFGH')
+    expect(await screen.findByLabelText('NEW PASSWORD')).toBeDefined()
+  })
+})
+
+describe('forced password reset', () => {
+  it('traps a needs-reset session on the set-password screen at any URL', async () => {
+    mockApi({ me: { id: 'p1', name: 'Ruth' }, needsPasswordReset: true })
+    window.history.replaceState({}, '', '/boards')
+    render(<App />)
+    expect(await screen.findByLabelText('NEW PASSWORD')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Ruth/ })).toBeNull()
+  })
+
+  it('validates length and match before calling the server', async () => {
+    const fetchMock = mockApi({
+      me: { id: 'p1', name: 'Ruth' },
+      needsPasswordReset: true,
+    })
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('NEW PASSWORD'), {
+      target: { value: 'short' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Lock it in/ }))
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'At least 8',
+    )
+    fireEvent.change(screen.getByLabelText('NEW PASSWORD'), {
+      target: { value: 'hunter22well' },
+    })
+    fireEvent.change(screen.getByLabelText('SAY IT AGAIN'), {
+      target: { value: 'hunter22welp' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Lock it in/ }))
+    expect((await screen.findByRole('alert')).textContent).toContain('match')
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/api/me/password',
+      expect.anything(),
+    )
+  })
+
+  it('unlocks the app once the new password lands', async () => {
+    mockApi({
+      me: { id: 'p1', name: 'Ruth' },
+      needsPasswordReset: true,
+      setPasswordBody: {
+        player: { id: 'p1', name: 'Ruth' },
+        needsPasswordReset: false,
+        isAdmin: false,
+      },
+    })
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('NEW PASSWORD'), {
+      target: { value: 'hunter22well' },
+    })
+    fireEvent.change(screen.getByLabelText('SAY IT AGAIN'), {
+      target: { value: 'hunter22well' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Lock it in/ }))
+    expect(await screen.findByRole('button', { name: /Ruth/ })).toBeDefined()
+  })
+})
+
+describe('logout', () => {
+  it('logs out from the profile popover back to the login screen', async () => {
+    const fetchMock = mockApi({ me: { id: 'p1', name: 'Ruth' } })
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /Ruth/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    expect(await screen.findByLabelText('YOUR NAME')).toBeDefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/logout',
+      expect.objectContaining({ method: 'POST' }),
+    )
+  })
+})
+
+describe('admin access', () => {
+  it('shows the Admin link and route to admins', async () => {
+    mockApi({ me: { id: 'p1', name: 'Ruth' }, isAdmin: true })
+    render(<App />)
+    fireEvent.click(await screen.findByRole('link', { name: 'Admin' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Player accounts' }),
+    ).toBeDefined()
+  })
+
+  it('hides the Admin link and bounces the route for everyone else', async () => {
+    mockApi({ me: { id: 'p1', name: 'Ruth' } })
+    window.history.replaceState({}, '', '/admin/users')
+    render(<App />)
+    // Bounced home by the catch-all.
+    expect(
+      await screen.findByRole('heading', { name: /Start a\s*new game/ }),
+    ).toBeDefined()
+    expect(screen.queryByRole('link', { name: 'Admin' })).toBeNull()
   })
 })
 

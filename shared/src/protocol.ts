@@ -219,24 +219,96 @@ export type StatsResponse = z.infer<typeof StatsResponseSchema>;
 
 // --- REST: players & session ---------------------------------------------
 // Identity rides in an httpOnly session cookie set by the server; the client
-// never sees or stores the token.
+// never sees or stores the token. There is no public registration: an admin
+// provisions each account and hands out a one-time code, which the player
+// uses as their first password. Until they set a real password the server
+// keeps them behind the reset gate (only /api/me and /api/me/password work).
 //
-// POST /api/players — sign in by claiming a unique name. Sets the cookie.
+// POST /api/login — name + password (or one-time code). Sets the cookie and
+//   rotates the session token, so any previous session for the player dies.
+// POST /api/logout — rotate the token and clear the cookie.
 // GET  /api/me — resolve the cookie to a player. 401 when the cookie is
-//   missing or the player no longer exists (a stale "ghost" session).
+//   missing or stale. Exempt from the reset gate.
+// POST /api/me/password — set a new password; clears needsPasswordReset.
 // PATCH /api/me — rename the signed-in player.
+// POST /api/players — admin only: provision an account → one-time code.
+// GET  /api/players — admin only: list every account.
+// POST /api/players/:id/code — admin only: re-issue a one-time code (doubles
+//   as a password reset; puts the player back behind the reset gate).
 
-export const CreatePlayerRequestSchema = z.object({ name: PlayerNameSchema });
-export type CreatePlayerRequest = z.infer<typeof CreatePlayerRequestSchema>;
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 128;
 
-export const CreatePlayerResponseSchema = z.object({ player: PlayerSchema });
-export type CreatePlayerResponse = z.infer<typeof CreatePlayerResponseSchema>;
+// No .trim(): passwords keep their whitespace exactly as typed.
+export const PasswordSchema = z
+  .string()
+  .min(PASSWORD_MIN, `At least ${PASSWORD_MIN} characters.`)
+  .max(PASSWORD_MAX, `Keep it under ${PASSWORD_MAX} characters.`);
 
-export const MeResponseSchema = z.object({ player: PlayerSchema });
+export const LoginRequestSchema = z.object({
+  name: PlayerNameSchema,
+  // Any non-empty string: one-time codes are shorter than PASSWORD_MIN, and
+  // the real check is the hash comparison server-side.
+  password: z.string().min(1, "Enter your code or password."),
+});
+export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+
+export const MeResponseSchema = z.object({
+  player: PlayerSchema,
+  // Private flags live here, never on PlayerSchema — GamePlayerSchema
+  // broadcasts PlayerSchema to the whole table. Defaults keep older payloads
+  // (and test stubs) parsing.
+  needsPasswordReset: z.boolean().default(false),
+  isAdmin: z.boolean().default(false),
+});
 export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+export const LoginResponseSchema = MeResponseSchema;
+export type LoginResponse = MeResponse;
+
+export const LogoutResponseSchema = z.object({ ok: z.literal(true) });
+export type LogoutResponse = z.infer<typeof LogoutResponseSchema>;
+
+export const SetPasswordRequestSchema = z.object({ password: PasswordSchema });
+export type SetPasswordRequest = z.infer<typeof SetPasswordRequestSchema>;
 
 export const RenamePlayerRequestSchema = z.object({ name: PlayerNameSchema });
 export type RenamePlayerRequest = z.infer<typeof RenamePlayerRequestSchema>;
+
+export const ProvisionPlayerRequestSchema = z.object({
+  name: PlayerNameSchema,
+});
+export type ProvisionPlayerRequest = z.infer<
+  typeof ProvisionPlayerRequestSchema
+>;
+
+export const ProvisionPlayerResponseSchema = z.object({
+  player: PlayerSchema,
+  /** Shown exactly once — the server stores only its hash. */
+  oneTimeCode: z.string(),
+});
+export type ProvisionPlayerResponse = z.infer<
+  typeof ProvisionPlayerResponseSchema
+>;
+
+export const ReissueCodeResponseSchema = z.object({ oneTimeCode: z.string() });
+export type ReissueCodeResponse = z.infer<typeof ReissueCodeResponseSchema>;
+
+// The admin roster view — flags are fine here because the endpoint itself is
+// admin-only.
+export const AdminPlayerSchema = z.object({
+  id: z.string(),
+  name: PlayerNameSchema,
+  needsPasswordReset: z.boolean(),
+  isAdmin: z.boolean(),
+  createdAt: z.string(), // ISO 8601
+});
+export type AdminPlayer = z.infer<typeof AdminPlayerSchema>;
+
+export const ListPlayersResponseSchema = z.object({
+  players: z.array(AdminPlayerSchema),
+});
+export type ListPlayersResponse = z.infer<typeof ListPlayersResponseSchema>;
 
 export const ApiErrorSchema = z.object({
   code: z.enum([
@@ -245,6 +317,11 @@ export const ApiErrorSchema = z.object({
     "invalid_board",
     "not_found",
     "unauthorized",
+    "invalid_credentials",
+    "password_reset_required",
+    "forbidden",
+    "invalid_password",
+    "rate_limited",
   ]),
   error: z.string(),
 });
@@ -252,9 +329,12 @@ export type ApiError = z.infer<typeof ApiErrorSchema>;
 export type ApiErrorCode = ApiError["code"];
 
 // --- Socket.IO typed-event maps ------------------------------------------
-// The socket authenticates via the session cookie on the handshake. A socket
-// joins one game room at a time; the server broadcasts the full public state
-// on every change (friends-scale tables — simplicity beats deltas).
+// The socket authenticates via the session cookie on the handshake; a
+// rejected handshake surfaces client-side as a `connect_error` whose message
+// is "unauthorized" (no/stale session) or "password_reset_required" (player
+// is still behind the reset gate). A socket joins one game room at a time;
+// the server broadcasts the full public state on every change (friends-scale
+// tables — simplicity beats deltas).
 
 export interface ClientToServerEvents {
   "game:join": (code: string, ack: (result: GameJoinResult) => void) => void;
