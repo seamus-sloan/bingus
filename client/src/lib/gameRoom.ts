@@ -47,8 +47,21 @@ export function useGameRoom(code: string): GameRoomStatus {
       })
     }
 
+    // A rejected handshake (stale session, or a player still behind the
+    // password-reset gate) would otherwise leave the screen on "joining"
+    // forever — surface it as a real error instead.
+    const onConnectError = (err: Error) => {
+      setError(
+        err.message === 'unauthorized' ||
+          err.message === 'password_reset_required'
+          ? 'Your session needs attention — head home and sign in again.'
+          : 'Lost the table. Check your connection and try again.',
+      )
+    }
+
     s.on('game:state', onState)
     s.on('game:chat', onChat)
+    s.on('connect_error', onConnectError)
     // (Re)join on every (re)connect so a dropped socket resumes its seat.
     s.on('connect', join)
     if (s.connected) join()
@@ -56,6 +69,7 @@ export function useGameRoom(code: string): GameRoomStatus {
     return () => {
       s.off('game:state', onState)
       s.off('game:chat', onChat)
+      s.off('connect_error', onConnectError)
       s.off('connect', join)
       joinedCode.current = null
       s.emit('game:leave')

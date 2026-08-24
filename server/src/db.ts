@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Board, BoardSize, Player } from "@bingus/shared";
+import type { AdminPlayer, Board, BoardSize, Player } from "@bingus/shared";
+import { generateOneTimeCode, hashPassword, verifyPassword } from "./passwords.ts";
 
 // node:sqlite is still marked experimental by Node, but the surface we use
 // (exec/prepare/get/run) is tiny — swap the driver here if it ever shifts.
@@ -29,31 +30,88 @@ export function openDb(path: string): DatabaseSync {
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_boards_created_at ON boards (created_at);
   `);
+  // Pre-auth databases exist in the wild; CREATE TABLE IF NOT EXISTS silently
+  // skips them, so column additions must be their own idempotent step.
+  // NULL password_hash = "cannot log in until an admin issues a code";
+  // needs_password_reset defaults to 1 so every pre-auth player is gated.
+  ensureColumn(db, "players", "password_hash", "password_hash TEXT");
+  ensureColumn(
+    db,
+    "players",
+    "needs_password_reset",
+    "needs_password_reset INTEGER NOT NULL DEFAULT 1",
+  );
+  ensureColumn(db, "players", "is_admin", "is_admin INTEGER NOT NULL DEFAULT 0");
   return db;
+}
+
+function ensureColumn(
+  db: DatabaseSync,
+  table: string,
+  column: string,
+  ddl: string,
+) {
+  const cols = db
+    .prepare("SELECT name FROM pragma_table_info(?)")
+    .all(table) as { name: string }[];
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
 }
 
 interface PlayerRow {
   id: string;
   name: string;
   token: string;
+  needs_password_reset: number;
+  is_admin: number;
+}
+
+/** A resolved session: the public player plus the private, never-broadcast flags. */
+export interface AuthedPlayer {
+  player: Player;
+  token: string;
+  needsPasswordReset: boolean;
+  isAdmin: boolean;
+}
+
+const PLAYER_SELECT =
+  "SELECT id, name, token, needs_password_reset, is_admin FROM players";
+
+function rowToAuthed(row: PlayerRow): AuthedPlayer {
+  return {
+    player: { id: row.id, name: row.name },
+    token: row.token,
+    needsPasswordReset: row.needs_password_reset === 1,
+    isAdmin: row.is_admin === 1,
+  };
 }
 
 export class PlayersRepo {
   constructor(private db: DatabaseSync) {}
 
-  /** Claim a unique name. Returns "name_taken" if it's already in use. */
-  create(name: string): { player: Player; token: string } | "name_taken" {
+  /**
+   * Provision an account under a unique name (admin flow). The one-time code
+   * is the player's first password — only its hash is stored, and the caller
+   * shows the plaintext exactly once. Returns "name_taken" on collision.
+   */
+  provision(
+    name: string,
+  ): { player: Player; oneTimeCode: string } | "name_taken" {
     const player: Player = { id: randomUUID(), name };
-    const token = randomUUID();
+    const oneTimeCode = generateOneTimeCode();
     try {
       this.db
-        .prepare("INSERT INTO players (id, name, token) VALUES (?, ?, ?)")
-        .run(player.id, player.name, token);
+        .prepare(
+          `INSERT INTO players (id, name, token, password_hash, needs_password_reset)
+           VALUES (?, ?, ?, ?, 1)`,
+        )
+        .run(player.id, player.name, randomUUID(), hashPassword(oneTimeCode));
     } catch (err) {
       if (isUniqueViolation(err)) return "name_taken";
       throw err;
     }
-    return { player, token };
+    return { player, oneTimeCode };
   }
 
   count(): number {
@@ -63,19 +121,105 @@ export class PlayersRepo {
     return row.n;
   }
 
-  get(id: string): { player: Player; token: string } | undefined {
+  get(id: string): AuthedPlayer | undefined {
     const row = this.db
-      .prepare("SELECT id, name, token FROM players WHERE id = ?")
+      .prepare(`${PLAYER_SELECT} WHERE id = ?`)
       .get(id) as PlayerRow | undefined;
-    return row && { player: { id: row.id, name: row.name }, token: row.token };
+    return row && rowToAuthed(row);
   }
 
   /** Resolve a session token to a player — the ghost-session gate. */
-  getByToken(token: string): { player: Player; token: string } | undefined {
+  getByToken(token: string): AuthedPlayer | undefined {
     const row = this.db
-      .prepare("SELECT id, name, token FROM players WHERE token = ?")
+      .prepare(`${PLAYER_SELECT} WHERE token = ?`)
       .get(token) as PlayerRow | undefined;
-    return row && { player: { id: row.id, name: row.name }, token: row.token };
+    return row && rowToAuthed(row);
+  }
+
+  /** Case-insensitive name lookup (NOCASE collation on the column). */
+  findByName(
+    name: string,
+  ): (AuthedPlayer & { hasPassword: boolean }) | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT id, name, token, needs_password_reset, is_admin, password_hash FROM players WHERE name = ?",
+      )
+      .get(name) as (PlayerRow & { password_hash: string | null }) | undefined;
+    return row && { ...rowToAuthed(row), hasPassword: row.password_hash !== null };
+  }
+
+  /**
+   * Check credentials and, on success, rotate the session token — logging in
+   * anywhere kills every other session for the player (one token per player).
+   */
+  verifyLogin(name: string, password: string): AuthedPlayer | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT id, name, token, needs_password_reset, is_admin, password_hash FROM players WHERE name = ?",
+      )
+      .get(name) as (PlayerRow & { password_hash: string | null }) | undefined;
+    if (!row || row.password_hash === null) {
+      // Burn a comparable amount of time so an unknown name isn't
+      // distinguishable from a wrong password by the clock.
+      verifyPassword(password, hashPassword("timing-decoy"));
+      return undefined;
+    }
+    if (!verifyPassword(password, row.password_hash)) return undefined;
+    const token = randomUUID();
+    this.db.prepare("UPDATE players SET token = ? WHERE id = ?").run(token, row.id);
+    return { ...rowToAuthed(row), token };
+  }
+
+  /** Set a real password and lift the reset gate. */
+  setPassword(id: string, password: string): void {
+    this.db
+      .prepare(
+        "UPDATE players SET password_hash = ?, needs_password_reset = 0 WHERE id = ?",
+      )
+      .run(hashPassword(password), id);
+  }
+
+  /**
+   * Re-issue a one-time code (the locked-out-friend rescue). Overwrites the
+   * password, re-arms the reset gate, and rotates the token so any live
+   * session for the account dies at its next request.
+   */
+  reissueCode(id: string): { oneTimeCode: string } | undefined {
+    if (!this.get(id)) return undefined;
+    const oneTimeCode = generateOneTimeCode();
+    this.db
+      .prepare(
+        "UPDATE players SET password_hash = ?, needs_password_reset = 1, token = ? WHERE id = ?",
+      )
+      .run(hashPassword(oneTimeCode), randomUUID(), id);
+    return { oneTimeCode };
+  }
+
+  /** Invalidate the current session token (logout). */
+  rotateToken(id: string): void {
+    this.db
+      .prepare("UPDATE players SET token = ? WHERE id = ?")
+      .run(randomUUID(), id);
+  }
+
+  setAdmin(id: string): void {
+    this.db.prepare("UPDATE players SET is_admin = 1 WHERE id = ?").run(id);
+  }
+
+  /** The admin roster — oldest account first. */
+  listAll(): AdminPlayer[] {
+    const rows = this.db
+      .prepare(
+        "SELECT id, name, needs_password_reset, is_admin, created_at FROM players ORDER BY created_at, rowid",
+      )
+      .all() as (Omit<PlayerRow, "token"> & { created_at: string })[];
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      needsPasswordReset: row.needs_password_reset === 1,
+      isAdmin: row.is_admin === 1,
+      createdAt: row.created_at,
+    }));
   }
 
   /** Rename a player. Returns "name_taken" if another player has the name. */
