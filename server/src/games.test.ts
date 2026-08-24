@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { freeIndex, type Board, type Player } from "@bingus/shared";
 import { GameManager, GameRoom } from "./games.ts";
 
@@ -266,6 +266,39 @@ describe("GameManager", () => {
     m.sweep(r.code);
     expect(m.get(r.code)).toBeUndefined();
     expect(m.liveCount()).toBe(0);
+  });
+
+  it("grace-delays a scheduled sweep so a leave→rejoin flicker survives", () => {
+    // Regression: React StrictMode's dev-mode effect replay emits
+    // join → leave → join for a fresh lobby. An instant sweep on the leave
+    // deleted the room before the rejoin ("No table with that code").
+    vi.useFakeTimers();
+    try {
+      const m = new GameManager();
+      const r = m.create(board(), HOST);
+      r.disconnect(HOST.id);
+      m.scheduleSweep(r.code);
+      r.join(HOST); // the rejoin lands within the grace window
+      vi.runAllTimers();
+      expect(m.get(r.code)).toBe(r);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still sweeps an abandoned lobby once the grace period passes", () => {
+    vi.useFakeTimers();
+    try {
+      const m = new GameManager();
+      const r = m.create(board(), HOST);
+      r.disconnect(HOST.id);
+      m.scheduleSweep(r.code);
+      expect(m.get(r.code)).toBe(r); // lingers through the grace window
+      vi.runAllTimers();
+      expect(m.get(r.code)).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("propagates renames into every seated room and notifies each", () => {
