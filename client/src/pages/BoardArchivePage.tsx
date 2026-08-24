@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import type { Board } from '@bingus/shared'
+import { termsRequired, type Board } from '@bingus/shared'
 import { AppHeader } from '../components/AppHeader'
 import { ApiError, createGame, deleteBoard, listBoards } from '../lib/api'
 import { useSession } from '../lib/session'
@@ -134,6 +134,13 @@ function BoardArchiveCard({
             ? 'fresh off the press'
             : `${board.plays} play${board.plays === 1 ? '' : 's'}`}
         </span>
+        {/* Only worth saying when the bank runs deeper than one card — a
+            board sized exactly to its grid deals everyone the same terms. */}
+        {board.terms.length > termsRequired(board.size) && (
+          <span className={styles.playsChip}>
+            {board.terms.length}-term bank
+          </span>
+        )}
       </div>
       <button className={styles.playCta} type="button" onClick={onPlay}>
         Play this board →

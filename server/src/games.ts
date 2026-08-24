@@ -1,6 +1,7 @@
 import {
   freeIndex,
   GAME_MAX_PLAYERS,
+  termsRequired,
   type Board,
   type ChatMessage,
   type GamePlayer,
@@ -23,7 +24,7 @@ const SWEEP_GRACE_MS = 10_000;
 
 interface PlayerState {
   player: Player;
-  card: string[]; // board terms in this player's order (FREE tile omitted)
+  card: string[]; // this player's dealt terms in card order (FREE tile omitted)
   marks: Set<number>;
   connected: boolean;
 }
@@ -55,7 +56,7 @@ export class GameRoom {
     return this.currentHostId;
   }
 
-  /** Add (or reconnect) a player. New players get a freshly shuffled card. */
+  /** Add (or reconnect) a player. New players get a freshly dealt card. */
   join(player: Player): { ok: true } | { error: string } {
     const existing = this.players.get(player.id);
     if (existing) {
@@ -68,7 +69,7 @@ export class GameRoom {
     }
     this.players.set(player.id, {
       player,
-      card: shuffled(this.board.terms),
+      card: deal(this.board),
       marks: new Set(),
       connected: true,
     });
@@ -114,14 +115,14 @@ export class GameRoom {
     return { ok: true };
   }
 
-  /** Run it back: fresh cards for every seat, back to the lobby. */
+  /** Run it back: fresh deals for every seat, back to the lobby. */
   rematch(byPlayerId: string): { ok: true } | { error: string } {
     if (!this.players.has(byPlayerId))
       return { error: "You're not at this table." };
     if (this.status !== "finished")
       return { error: "This game isn't over yet." };
     for (const seat of this.players.values()) {
-      seat.card = shuffled(this.board.terms);
+      seat.card = deal(this.board);
       seat.marks.clear();
     }
     this.winner = null;
@@ -302,6 +303,16 @@ export class GameManager {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((g) => g.toSummary());
   }
+}
+
+/**
+ * Deal one card off the board's word bank: shuffle the bank, take the first
+ * n*n - 1 terms. A bank sized exactly to the card is the degenerate case —
+ * every seat gets the same terms in a different order — while a deeper bank
+ * makes cards differ in content, so no two players are hunting the same list.
+ */
+function deal(board: Board): string[] {
+  return shuffled(board.terms).slice(0, termsRequired(board.size));
 }
 
 function shuffled<T>(items: T[]): T[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { freeIndex, type Board, type Player } from "@bingus/shared";
+import { freeIndex, termsRequired, type Board, type Player } from "@bingus/shared";
 import { GameManager, GameRoom } from "./games.ts";
 
 const HOST: Player = { id: "host-1", name: "Ruth" };
@@ -15,6 +15,14 @@ function board(size: 3 | 5 = 3): Board {
     createdBy: "Ruth",
     plays: 0,
     createdAt: new Date().toISOString(),
+  };
+}
+
+/** Same board, but stocked well past the tiles one card can hold. */
+function deepBankBoard(size: 3 | 5 = 3, bank = 100): Board {
+  return {
+    ...board(size),
+    terms: Array.from({ length: bank }, (_, i) => `term ${i}`),
   };
 }
 
@@ -44,6 +52,32 @@ describe("GameRoom", () => {
     for (const p of state.players) {
       expect([...p.card].sort()).toEqual([...r.board.terms].sort());
     }
+  });
+
+  it("deals a card-sized hand off a deeper word bank", () => {
+    const b = deepBankBoard();
+    const r = new GameRoom("BNGS-777", b, HOST.id);
+    r.join(HOST);
+    r.join(RIVAL);
+    for (const p of r.toState().players) {
+      expect(p.card).toHaveLength(termsRequired(b.size));
+      // Every dealt term comes off the bank, and none is dealt twice.
+      expect(new Set(p.card).size).toBe(p.card.length);
+      for (const term of p.card) expect(b.terms).toContain(term);
+    }
+  });
+
+  it("gives players different terms, not just a different order", () => {
+    const b = deepBankBoard();
+    const r = new GameRoom("BNGS-778", b, HOST.id);
+    r.join(HOST);
+    r.join(RIVAL);
+    // Two 8-tile hands off a 100-term bank landing on the same eight terms is
+    // a 1-in-C(100,8) coincidence (~1 in 1.9e11), so a shared hand here means
+    // the deal stopped drawing from the bank.
+    const hands = r.toState().players.map((p) => new Set(p.card));
+    const shared = [...hands[0]].filter((t) => hands[1].has(t));
+    expect(shared.length).toBeLessThan(termsRequired(b.size));
   });
 
   it("keeps a player's card and marks across reconnects", () => {

@@ -105,7 +105,7 @@ describe('edit board page', () => {
       (screen.getByLabelText('BOARD NAME') as HTMLInputElement).value,
     ).toBe('Retro Bingo')
     expect(
-      (screen.getByLabelText('YOUR TERMS — ONE PER LINE') as HTMLTextAreaElement)
+      (screen.getByLabelText('YOUR WORD BANK — ONE PER LINE') as HTMLTextAreaElement)
         .value,
     ).toBe(TERMS_8.join('\n'))
     // The board's size arrives selected.

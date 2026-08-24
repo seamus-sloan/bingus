@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   ApiErrorSchema,
+  BOARD_TERMS_MAX,
+  CreateBoardRequestSchema,
   MeResponseSchema,
   PASSWORD_MAX,
   PASSWORD_MIN,
   PasswordSchema,
   PLAYER_NAME_MAX,
   PlayerNameSchema,
+  termsRequired,
 } from "./protocol.ts";
 
 describe("PlayerNameSchema", () => {
@@ -55,5 +58,41 @@ describe("ApiErrorSchema", () => {
     ]) {
       expect(ApiErrorSchema.safeParse({ code, error: "nope" }).success).toBe(true);
     }
+  });
+});
+
+describe("CreateBoardRequestSchema", () => {
+  const bank = (n: number) => Array.from({ length: n }, (_, i) => `term ${i}`);
+  const board = (terms: string[]) => ({ name: "Standup", size: 3 as const, terms });
+
+  it("accepts a bank sized exactly to the card", () => {
+    expect(CreateBoardRequestSchema.safeParse(board(bank(termsRequired(3)))).success).toBe(
+      true,
+    );
+  });
+
+  it("accepts a bank deeper than the card", () => {
+    expect(CreateBoardRequestSchema.safeParse(board(bank(60))).success).toBe(true);
+  });
+
+  it("rejects a bank too small to fill a card", () => {
+    const short = CreateBoardRequestSchema.safeParse(
+      board(bank(termsRequired(3) - 1)),
+    );
+    expect(short.success).toBe(false);
+  });
+
+  it("rejects a bank over the cap", () => {
+    expect(
+      CreateBoardRequestSchema.safeParse(board(bank(BOARD_TERMS_MAX + 1))).success,
+    ).toBe(false);
+    expect(
+      CreateBoardRequestSchema.safeParse(board(bank(BOARD_TERMS_MAX))).success,
+    ).toBe(true);
+  });
+
+  it("still rejects duplicates, however deep the bank", () => {
+    const dupes = [...bank(30), "term 0"];
+    expect(CreateBoardRequestSchema.safeParse(board(dupes)).success).toBe(false);
   });
 });

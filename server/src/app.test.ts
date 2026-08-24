@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Hono } from "hono";
+import { BOARD_TERMS_MAX } from "@bingus/shared";
 import type {
   ApiError,
   Board,
@@ -543,9 +544,28 @@ describe("boards", () => {
     expect(list.status).toBe(401);
   });
 
-  it("rejects a term count that does not match the size", async () => {
+  it("rejects a word bank too small to fill a card", async () => {
     const { cookie } = await signIn("Ruth");
     const created = await createBoard(cookie, { size: 5 });
+    expect(created.status).toBe(400);
+    expect(created.body.code).toBe("invalid_board");
+  });
+
+  it("accepts a word bank deeper than the card", async () => {
+    const { cookie } = await signIn("Ruth");
+    const terms = Array.from({ length: 40 }, (_, i) => `term ${i}`);
+    const created = await createBoard(cookie, { size: 3, terms });
+    expect(created.status).toBe(201);
+    expect(created.body.board.terms).toHaveLength(40);
+  });
+
+  it("rejects a word bank over the cap", async () => {
+    const { cookie } = await signIn("Ruth");
+    const terms = Array.from(
+      { length: BOARD_TERMS_MAX + 1 },
+      (_, i) => `term ${i}`,
+    );
+    const created = await createBoard(cookie, { size: 3, terms });
     expect(created.status).toBe(400);
     expect(created.body.code).toBe("invalid_board");
   });

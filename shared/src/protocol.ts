@@ -18,9 +18,11 @@ export const PlayerSchema = z.object({
 export type Player = z.infer<typeof PlayerSchema>;
 
 // --- Boards --------------------------------------------------------------
-// A board is a named set of terms. Every player in a game gets the same
-// terms shuffled into their own card; the center tile is a FREE space, so a
-// size-n board needs n*n - 1 terms.
+// A board is a named word bank. Each player's card is dealt from that bank
+// server-side: shuffle, then take the first n*n - 1 terms (the center tile is
+// a FREE space). A bank of exactly n*n - 1 gives everyone the same terms in a
+// different order; a bigger bank makes cards differ in content too, which is
+// the point of stocking one.
 //
 // GET  /api/boards?search=&limit=&offset= — browse the archive (newest first).
 // POST /api/boards — print a fresh board (requires a session).
@@ -38,8 +40,14 @@ export type BoardSize = z.infer<typeof BoardSizeSchema>;
 
 export const BOARD_NAME_MAX = 60;
 export const TERM_MAX = 80;
+/** Ceiling on a board's word bank — deep enough for genuinely varied cards,
+ *  shallow enough that the archive row stays a reasonable size. */
+export const BOARD_TERMS_MAX = 200;
 
-/** Terms a board of this size needs (center tile is FREE). */
+/**
+ * Tiles a card of this size holds, and so the smallest word bank a board can
+ * ship with (center tile is FREE). Banks may be larger — see BOARD_TERMS_MAX.
+ */
 export function termsRequired(size: BoardSize): number {
   return size * size - 1;
 }
@@ -86,8 +94,11 @@ export const CreateBoardRequestSchema = z
     size: BoardSizeSchema,
     terms: z.array(BoardTermSchema),
   })
-  .refine((b) => b.terms.length === termsRequired(b.size), {
-    message: "Term count must match the board size (center tile is free).",
+  .refine((b) => b.terms.length >= termsRequired(b.size), {
+    message: "Not enough terms to fill a card (center tile is free).",
+  })
+  .refine((b) => b.terms.length <= BOARD_TERMS_MAX, {
+    message: `A word bank tops out at ${BOARD_TERMS_MAX} terms.`,
   })
   .refine(
     (b) => new Set(b.terms.map((t) => t.toLowerCase())).size === b.terms.length,
@@ -111,10 +122,10 @@ export type DeleteBoardResponse = z.infer<typeof DeleteBoardResponseSchema>;
 
 // --- Games ----------------------------------------------------------------
 // A game is a live table for one board. It lives in server memory: created
-// via REST, then everything else happens over the socket. Every player gets
-// the board's terms shuffled by a server-held seed; index `freeIndex(size)`
-// is the FREE tile. Marks are self-reported; the server is the referee and
-// detects row / column / diagonal / blackout wins.
+// via REST, then everything else happens over the socket. Every player is
+// dealt their own card from the board's word bank server-side; index
+// `freeIndex(size)` is the FREE tile. Marks are self-reported; the server is
+// the referee and detects row / column / diagonal / blackout wins.
 //
 // POST /api/games {boardId} — open a table (host = session player) → {code}.
 // GET  /api/games — list joinable tables (lobby + playing, newest first).
@@ -161,7 +172,7 @@ export type CreateGameResponse = z.infer<typeof CreateGameResponseSchema>;
 // by design — rivals' mini boards and the "peek" feature depend on it.
 export const GamePlayerSchema = z.object({
   player: PlayerSchema,
-  /** The board's terms in this player's shuffled order (FREE tile omitted — it sits at freeIndex). */
+  /** This player's dealt terms in card order (FREE tile omitted — it sits at freeIndex). */
   card: z.array(z.string()),
   /** Marked cell indices (0..size²-1); the FREE tile is always implicitly marked. */
   marks: z.array(z.number().int().nonnegative()),

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import {
   BOARD_NAME_MAX,
   BOARD_SIZES,
+  BOARD_TERMS_MAX,
   termsRequired,
   type BoardSize,
   type CreateBoardRequest,
@@ -52,8 +53,10 @@ export function BoardForm({
     .split('\n')
     .map((t) => t.trim())
     .filter(Boolean)
+  // `required` is the card's tile count, and so the shallowest bank that can
+  // fill one. Anything above it is depth: extra terms the deal can reach for.
   const required = termsRequired(size)
-  const countRight = terms.length === required
+  const countRight = terms.length >= required && terms.length <= BOARD_TERMS_MAX
   const center = Math.floor((size * size) / 2)
 
   // What still blocks the submit button — rendered next to it so the
@@ -63,8 +66,8 @@ export function BoardForm({
   if (terms.length < required) {
     const short = required - terms.length
     missing.push(`${short} more term${short === 1 ? '' : 's'}`)
-  } else if (terms.length > required) {
-    missing.push(`${terms.length - required} too many terms`)
+  } else if (terms.length > BOARD_TERMS_MAX) {
+    missing.push(`${terms.length - BOARD_TERMS_MAX} terms over the cap`)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -128,7 +131,7 @@ export function BoardForm({
                   {s === size && ' ✓'}
                 </span>
                 <span className={styles.sizeSub}>
-                  {termsRequired(s)} terms · {SIZE_FLAVOR[s]}
+                  {termsRequired(s)} tiles · {SIZE_FLAVOR[s]}
                 </span>
               </button>
             ))}
@@ -137,10 +140,10 @@ export function BoardForm({
         <div className={styles.field}>
           <div className={styles.labelRow}>
             <label className={styles.label} htmlFor="board-terms">
-              YOUR TERMS — ONE PER LINE
+              YOUR WORD BANK — ONE PER LINE
             </label>
             <span className={countRight ? styles.chipDone : styles.chip}>
-              {terms.length} / {required}
+              {terms.length} / {required} min
               {countRight && ' ✓'}
             </span>
           </div>
@@ -156,8 +159,11 @@ export function BoardForm({
             }}
           />
           <p className={styles.hint}>
-            The center tile is a FREE space — we throw it in for nothing. Make
-            the terms spicy.
+            Each card is dealt {required} terms off this bank, and the center
+            tile is a FREE space we throw in for nothing. Stock more than{' '}
+            {required} (up to {BOARD_TERMS_MAX}) and no two players get the
+            same board — stop at {required} and everyone shares one term list,
+            shuffled.
           </p>
         </div>
         <div className={styles.errorSlot}>
@@ -190,7 +196,7 @@ export function BoardForm({
         )}
       </form>
       <aside className={styles.previewCol}>
-        <div className={styles.previewLabel}>LIVE PREVIEW — SHUFFLED PER PLAYER</div>
+        <div className={styles.previewLabel}>LIVE PREVIEW — DEALT PER PLAYER</div>
         <div
           className={styles.previewCard}
           data-testid="board-preview"
@@ -213,7 +219,9 @@ export function BoardForm({
           })}
         </div>
         <p className={styles.previewCaption}>
-          Every player gets these same {required} terms in a different order.
+          {terms.length > required
+            ? `One of many ${required}-tile hands off a ${terms.length}-term bank.`
+            : `Every player gets these same ${required} terms in a different order.`}{' '}
           Row, column, diagonal or full blackout wins.
         </p>
       </aside>
