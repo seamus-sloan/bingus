@@ -3,25 +3,33 @@ import {
   CreateBoardResponseSchema,
   CreateGameResponseSchema,
   DeleteBoardResponseSchema,
-  CreatePlayerResponseSchema,
   GetBoardResponseSchema,
   ListBoardsResponseSchema,
   ListGamesResponseSchema,
+  ListPlayersResponseSchema,
+  LogoutResponseSchema,
   MeResponseSchema,
+  ProvisionPlayerResponseSchema,
+  ReissueCodeResponseSchema,
   type ApiErrorCode,
   type CreateBoardRequest,
   type CreateBoardResponse,
   type CreateGameRequest,
   type CreateGameResponse,
   type DeleteBoardResponse,
-  type CreatePlayerRequest,
-  type CreatePlayerResponse,
   type GetBoardResponse,
   type ListBoardsQuery,
   type ListBoardsResponse,
   type ListGamesResponse,
+  type ListPlayersResponse,
+  type LoginRequest,
+  type LogoutResponse,
   type MeResponse,
+  type ProvisionPlayerRequest,
+  type ProvisionPlayerResponse,
+  type ReissueCodeResponse,
   type RenamePlayerRequest,
+  type SetPasswordRequest,
   type UpdateBoardRequest,
   StatsResponseSchema,
   type StatsResponse,
@@ -120,16 +128,63 @@ export function createGame(boardId: string): Promise<CreateGameResponse> {
   )
 }
 
-// Sign in. The server responds with the player and sets the httpOnly session
-// cookie — the token never reaches client code.
-export function createPlayer(name: string): Promise<CreatePlayerResponse> {
+// Log in with a password or one-time code. The server sets the httpOnly
+// session cookie — the token never reaches client code.
+export function logIn(name: string, password: string): Promise<MeResponse> {
+  return request(
+    '/api/login',
+    {
+      method: 'POST',
+      body: JSON.stringify({ name, password } satisfies LoginRequest),
+    },
+    (data) => MeResponseSchema.parse(data),
+  )
+}
+
+export function logOut(): Promise<LogoutResponse> {
+  return request('/api/logout', { method: 'POST' }, (data) =>
+    LogoutResponseSchema.parse(data),
+  )
+}
+
+// Set a new password; clears the needs-reset gate server-side.
+export function setPassword(password: string): Promise<MeResponse> {
+  return request(
+    '/api/me/password',
+    {
+      method: 'POST',
+      body: JSON.stringify({ password } satisfies SetPasswordRequest),
+    },
+    (data) => MeResponseSchema.parse(data),
+  )
+}
+
+// Admin only: create an account. The one-time code in the response is shown
+// exactly once — the server keeps only its hash.
+export function provisionPlayer(
+  name: string,
+): Promise<ProvisionPlayerResponse> {
   return request(
     '/api/players',
     {
       method: 'POST',
-      body: JSON.stringify({ name } satisfies CreatePlayerRequest),
+      body: JSON.stringify({ name } satisfies ProvisionPlayerRequest),
     },
-    (data) => CreatePlayerResponseSchema.parse(data),
+    (data) => ProvisionPlayerResponseSchema.parse(data),
+  )
+}
+
+export function listPlayers(): Promise<ListPlayersResponse> {
+  return request('/api/players', {}, (data) =>
+    ListPlayersResponseSchema.parse(data),
+  )
+}
+
+// Admin only: re-issue a one-time code (invalidates the player's password
+// and any live session).
+export function reissueCode(playerId: string): Promise<ReissueCodeResponse> {
+  return request(`/api/players/${playerId}/code`, { method: 'POST' }, (data) =>
+    ReissueCodeResponseSchema.parse(data),
   )
 }
 

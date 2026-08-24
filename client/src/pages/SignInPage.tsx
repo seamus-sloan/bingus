@@ -19,8 +19,9 @@ const FLOATS = [
 ]
 
 export function SignInPage() {
-  const { signIn } = useSession()
+  const { logIn } = useSession()
   const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -29,7 +30,7 @@ export function SignInPage() {
     setError(null)
     setPending(true)
     try {
-      await signIn(name)
+      await logIn(name, password)
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -78,14 +79,29 @@ export function SignInPage() {
             value={name}
             maxLength={PLAYER_NAME_MAX}
             autoFocus
+            autoComplete="username"
             onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="player-password">
+            CODE OR PASSWORD
+          </label>
+          <input
+            id="player-password"
+            className={styles.input}
+            type="password"
+            placeholder="Your password (or a fresh code)"
+            value={password}
+            autoComplete="current-password"
+            onChange={(e) => setPassword(e.target.value)}
           />
           {error ? (
             <div className={styles.error} role="alert">
               {error}
             </div>
           ) : (
-            <div className={styles.hint}>No account needed. Choose wisely.</div>
+            <div className={styles.hint}>No account? Bug the host for a code.</div>
           )}
         </div>
         <button className={styles.submit} type="submit" disabled={pending}>

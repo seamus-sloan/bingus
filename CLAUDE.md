@@ -1,6 +1,6 @@
 # Bingus
 
-Multiplayer bingo web app: name-only sign-in, board archive + board creator, live game tables with per-player shuffled cards, self-marked tiles, row/column/diagonal/blackout wins, and game chat.
+Multiplayer bingo web app: password login with admin-provisioned accounts (no public registration — one-time codes, forced first-login password set), board archive + board creator, live game tables with per-player shuffled cards, self-marked tiles, row/column/diagonal/blackout wins, and game chat.
 
 **Read [docs/architecture.md](docs/architecture.md) before touching client↔server communication.** It defines the two channels (Hono REST under `/api`, Socket.IO for realtime) and the shared-protocol rule.
 

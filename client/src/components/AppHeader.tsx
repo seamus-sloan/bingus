@@ -6,7 +6,7 @@ import { useSession } from '../lib/session'
 import styles from './AppHeader.module.css'
 
 export function AppHeader() {
-  const { player, rename } = useSession()
+  const { player, isAdmin, rename, logOut } = useSession()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +50,11 @@ export function AppHeader() {
         <h1 className={styles.wordmark}>Bingus</h1>
       </Link>
       <div className={styles.profileWrap}>
+        {isAdmin && (
+          <Link to="/admin/users" className={styles.adminLink}>
+            Admin
+          </Link>
+        )}
         <button
           type="button"
           className={styles.chip}
@@ -85,6 +90,13 @@ export function AppHeader() {
                 Cancel
               </button>
             </div>
+            <button
+              className={styles.logout}
+              type="button"
+              onClick={() => void logOut()}
+            >
+              Log out
+            </button>
           </form>
         )}
       </div>

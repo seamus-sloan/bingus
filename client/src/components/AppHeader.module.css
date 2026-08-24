@@ -37,6 +37,26 @@
 .profileWrap {
   margin-left: auto;
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.adminLink {
+  padding: 7px 15px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--yellow);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.adminLink:active {
+  translate: 1px 1px;
+  box-shadow: 2px 2px 0 var(--ink);
 }
 
 .chip {
@@ -147,6 +167,20 @@
   background: #fff;
   font-weight: 800;
   font-size: 13.5px;
+  border: 2.5px solid var(--ink);
+  box-shadow: 3px 3px 0 rgba(43, 27, 51, 0.2);
+  cursor: pointer;
+}
+
+.logout {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: var(--paper);
+  font-weight: 800;
+  font-size: 13.5px;
+  color: var(--magenta);
   border: 2.5px solid var(--ink);
   box-shadow: 3px 3px 0 rgba(43, 27, 51, 0.2);
   cursor: pointer;

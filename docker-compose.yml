@@ -3,7 +3,10 @@
 # Quick start:
 #   1. `docker compose up -d` (pulls sesloan/bingus from Docker Hub; add
 #      `--build` and swap `image:` for `build: .` to build locally instead).
-#   2. Open http://<host>:3000 and claim a name.
+#   2. `docker compose logs bingus` — the first boot prints a one-time login
+#      code for the BINGUS_ADMIN account.
+#   3. Open http://<host>:3000, log in as the admin with that code, set a
+#      password, then create accounts for friends under /admin/users.
 #
 # Volume model:
 #   /data   durable state — the SQLite database (back this up)
@@ -29,3 +32,14 @@ services:
       # lands owned by you. Set to your `id -u` / `id -g` (default 1000:1000).
       PUID: "1000"
       PGID: "1000"
+
+      # The admin account, bootstrapped on boot. First boot (or a database
+      # whose admin has no password yet) prints a one-time login code to the
+      # container logs; later boots are a no-op.
+      BINGUS_ADMIN: "Seamus"
+
+      # Mark the session cookie Secure — enable ONLY once TLS terminates in
+      # front of this container. Behind plain HTTP (LAN serving) it must stay
+      # off: browsers silently drop Secure cookies, and every login appears
+      # to succeed but nobody stays signed in.
+      # BINGUS_SECURE_COOKIES: "true"

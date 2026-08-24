@@ -6,23 +6,31 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Player } from '@bingus/shared'
-import { createPlayer, getMe, renameMe } from './api'
+import type { MeResponse, Player } from '@bingus/shared'
+import * as api from './api'
+import { socket } from './socket'
 
 // Identity rides in an httpOnly session cookie owned by the server. On load
 // we ask /api/me who we are — if the cookie is missing or points at a player
 // that no longer exists (a ghost session), the server 401s and we land on
-// the sign-in screen. Client code never sees the token.
+// the login screen. Client code never sees the token.
+//
+// The signed-in state carries the whole MeResponse: `needsPasswordReset`
+// drives the forced set-password screen, `isAdmin` unlocks the admin route.
 
 type SessionState =
-  | { status: 'loading'; player: null }
-  | { status: 'signed-out'; player: null }
-  | { status: 'signed-in'; player: Player }
+  | { status: 'loading'; me: null }
+  | { status: 'signed-out'; me: null }
+  | { status: 'signed-in'; me: MeResponse }
 
 interface SessionContextValue {
   status: SessionState['status']
   player: Player | null
-  signIn: (name: string) => Promise<void>
+  needsPasswordReset: boolean
+  isAdmin: boolean
+  logIn: (name: string, password: string) => Promise<void>
+  logOut: () => Promise<void>
+  setPassword: (password: string) => Promise<void>
   rename: (name: string) => Promise<void>
 }
 
@@ -31,43 +39,65 @@ const SessionContext = createContext<SessionContextValue | null>(null)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({
     status: 'loading',
-    player: null,
+    me: null,
   })
 
   useEffect(() => {
     // Pre-cookie builds kept the session in localStorage — clear the leftover.
     localStorage.removeItem('bingus.session')
     let cancelled = false
-    getMe()
+    api
+      .getMe()
       .then((res) => {
         if (cancelled) return
         setState(
           res
-            ? { status: 'signed-in', player: res.player }
-            : { status: 'signed-out', player: null },
+            ? { status: 'signed-in', me: res }
+            : { status: 'signed-out', me: null },
         )
       })
       .catch(() => {
-        if (!cancelled) setState({ status: 'signed-out', player: null })
+        if (!cancelled) setState({ status: 'signed-out', me: null })
       })
     return () => {
       cancelled = true
     }
   }, [])
 
-  const signIn = useCallback(async (name: string) => {
-    const { player } = await createPlayer(name)
-    setState({ status: 'signed-in', player })
+  const logIn = useCallback(async (name: string, password: string) => {
+    const me = await api.logIn(name, password)
+    setState({ status: 'signed-in', me })
+  }, [])
+
+  const logOut = useCallback(async () => {
+    await api.logOut()
+    // A live game socket would outlive the dead session — cut it too.
+    socket.disconnect()
+    setState({ status: 'signed-out', me: null })
+  }, [])
+
+  const setPassword = useCallback(async (password: string) => {
+    const me = await api.setPassword(password)
+    setState({ status: 'signed-in', me })
   }, [])
 
   const rename = useCallback(async (name: string) => {
-    const { player } = await renameMe(name)
-    setState({ status: 'signed-in', player })
+    const me = await api.renameMe(name)
+    setState({ status: 'signed-in', me })
   }, [])
 
   return (
     <SessionContext.Provider
-      value={{ status: state.status, player: state.player, signIn, rename }}
+      value={{
+        status: state.status,
+        player: state.me?.player ?? null,
+        needsPasswordReset: state.me?.needsPasswordReset ?? false,
+        isAdmin: state.me?.isAdmin ?? false,
+        logIn,
+        logOut,
+        setPassword,
+        rename,
+      }}
     >
       {children}
     </SessionContext.Provider>
