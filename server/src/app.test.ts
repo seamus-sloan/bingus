@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Hono } from "hono";
 import type {
   ApiError,
@@ -389,5 +392,62 @@ describe("PATCH /api/me", () => {
     const renamed = await rename(`${SESSION_COOKIE}=bogus`, "Sneaky");
     expect(renamed.status).toBe(401);
     expect(renamed.body.code).toBe("unauthorized");
+  });
+});
+
+describe("static client serving (prod)", () => {
+  let staticApp: Hono;
+  let staticDir: string;
+
+  beforeEach(() => {
+    staticDir = mkdtempSync(join(tmpdir(), "bingus-static-"));
+    writeFileSync(join(staticDir, "index.html"), "<html>bingus shell</html>");
+    writeFileSync(join(staticDir, "app.js"), "console.log('bingus')");
+    const db = openDb(":memory:");
+    staticApp = createApp(
+      new PlayersRepo(db),
+      new BoardsRepo(db),
+      new GameManager(),
+      staticDir,
+    );
+  });
+
+  afterEach(() => {
+    rmSync(staticDir, { recursive: true, force: true });
+  });
+
+  it("serves files from the static dir", async () => {
+    const res = await staticApp.request("/app.js");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("console.log('bingus')");
+  });
+
+  it("serves index.html at the root", async () => {
+    const res = await staticApp.request("/");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("<html>bingus shell</html>");
+  });
+
+  it("falls back to index.html for client-side routes", async () => {
+    const res = await staticApp.request("/game/BNGS-123");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("<html>bingus shell</html>");
+  });
+
+  it("keeps API routes winning over static files", async () => {
+    const res = await staticApp.request("/api/health");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, service: "bingus-server" });
+  });
+
+  it("404s unknown API paths with JSON, not the SPA shell", async () => {
+    const res = await staticApp.request("/api/nope");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as ApiError).code).toBe("not_found");
+  });
+
+  it("serves nothing extra when no static dir is configured", async () => {
+    const res = await app.request("/game/BNGS-123");
+    expect(res.status).toBe(404);
   });
 });

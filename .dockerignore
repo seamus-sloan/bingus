@@ -1,0 +1,13 @@
+# Keep the build context to sources + manifests.
+.git
+.github
+.claude
+docs
+**/node_modules
+client/dist
+server/data
+**/*.test.ts
+**/*.test.tsx
+*.md
+docker-compose.yml
+Dockerfile

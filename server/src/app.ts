@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { getCookie, setCookie } from "hono/cookie";
 import {
   CreateBoardRequestSchema,
@@ -29,10 +30,13 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // a year of trash talk
 
 // HTTP surface: REST endpoints live here (players, board archive, health).
 // Realtime traffic goes through Socket.IO — see socket.ts.
+// `staticDir` (prod only) is the built client bundle; serving it from this
+// app keeps client and API same-origin, which the whole design assumes.
 export function createApp(
   players: PlayersRepo,
   boards: BoardsRepo,
   games: GameManager,
+  staticDir?: string,
 ) {
   const app = new Hono();
 
@@ -192,6 +196,28 @@ export function createApp(
     games.renamePlayer(me.player.id, result.name);
     return c.json({ player: result } satisfies MeResponse);
   });
+
+  if (staticDir) {
+    // API routes above always win — this middleware only sees requests none
+    // of them matched. /socket.io/* never reaches Hono at all (Socket.IO
+    // claims it on the raw HTTP server — see index.ts).
+    app.use("*", serveStatic({ root: staticDir }));
+    // SPA fallback: client-side routes (/boards, /game/:code) must survive a
+    // hard refresh, so any non-API GET that didn't match a file gets
+    // index.html. Unmatched /api paths keep returning JSON, not HTML.
+    const spaIndex = serveStatic({ root: staticDir, path: "index.html" });
+    app.get("*", async (c, next) => {
+      if (c.req.path.startsWith("/api/")) {
+        return c.json(
+          { code: "not_found", error: "No such endpoint." } satisfies ApiError,
+          404,
+        );
+      }
+      // serveStatic yields void when the file is missing (it deferred to
+      // next()); surface that as a plain 404 instead of an untyped hole.
+      return (await spaIndex(c, next)) ?? c.notFound();
+    });
+  }
 
   return app;
 }

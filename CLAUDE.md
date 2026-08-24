@@ -13,7 +13,7 @@ Multiplayer bingo web app: name-only sign-in, board archive + board creator, liv
 
 ## Layout
 
-pnpm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on Node, run via tsx; SQLite via node:sqlite in `server/data/`), `shared/` (`@bingus/shared` — the wire protocol).
+pnpm workspaces: `client/` (Vite + React 19 + TS), `server/` (Hono + Socket.IO on Node, run via tsx; SQLite via node:sqlite in `server/data/`), `shared/` (`@bingus/shared` — the wire protocol). Deployment: single Docker image (`sesloan/bingus`, published per release — see the "Releases & deployment" section of [docs/architecture.md](docs/architecture.md)).
 
 ## Non-negotiable conventions
 
