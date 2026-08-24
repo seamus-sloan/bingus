@@ -30,7 +30,7 @@ Current endpoints:
 - `GET /api/games` — list joinable tables (lobby + playing, newest first) for the Live Tables screen, which polls it every 5s.
 
 - In **dev**, the client calls same-origin paths (`fetch('/api/...')`) and the Vite dev server proxies them to `http://localhost:3000` (see [client/vite.config.ts](../client/vite.config.ts)). No CORS anywhere.
-- In **prod**, the client build is static and is expected to be served from the same origin as the server, so the same same-origin calls work unchanged.
+- In **prod**, the server itself serves the client build same-origin: `BINGUS_STATIC_DIR` (set in the Docker image, unset in dev) points at `client/dist`, and the app mounts it after the API routes with an SPA fallback — any non-`/api` GET that doesn't match a file gets `index.html` so client-side routes survive a hard refresh, while unmatched `/api/*` paths still return JSON 404s.
 
 ### 2. Socket.IO — realtime game traffic
 
@@ -74,3 +74,12 @@ Active game state lives in memory on the single server process (`server/src/game
 ## CI
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs three jobs on every push/PR: `lint`, `test`, and `build` — the same three root scripts, so CI and local always agree.
+
+## Releases & deployment
+
+Same architecture as omnibus: every merge to `main` cuts a release, each release publishes a Docker image, and the host just pulls `latest`.
+
+- **Release** ([.github/workflows/release.yml](../.github/workflows/release.yml)) — on merged PR, the shared [`seamus-sloan/gh-actions/release@v1`](https://github.com/seamus-sloan/gh-actions) action bumps semver from the latest release (patch by default; `minor version` label for a minor bump; `no release` or unlabeled docs/CI-only PRs skip), creates the GitHub release, and dispatches the Docker workflow with the new tag.
+- **Docker** ([.github/workflows/docker.yml](../.github/workflows/docker.yml)) — builds `linux/amd64` + `linux/arm64` on native runners, pushes each by digest, then merges them into one multi-arch manifest on Docker Hub as `sesloan/bingus` tagged `X.Y.Z` / `X.Y` / `X` / `latest`. Needs the `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` repo secrets.
+- **Image** ([Dockerfile](../Dockerfile)) — single container: a builder stage compiles the Vite client, a deps stage installs the server's prod dependency tree, and the runtime stage serves the SPA from the server via `BINGUS_STATIC_DIR` with tsx running the TypeScript server directly (`tsx` is a runtime dependency of `@bingus/server` for exactly this reason). SQLite lives at `/data/bingus.db` on the `/data` volume; a PUID/PGID entrypoint ([docker/entrypoint.sh](../docker/entrypoint.sh)) drops root before serving; `/api/health` backs the container healthcheck.
+- **Host** ([docker-compose.yml](../docker-compose.yml)) — pulls `sesloan/bingus:latest`, publishes port 3000, bind-mounts `./data:/data`.

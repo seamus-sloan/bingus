@@ -1,0 +1,39 @@
+name: Release
+
+# Name the run after the PR that triggered it so the Actions list shows which
+# merge each release run belongs to; the minted version is written to the run's
+# step summary (the tag is computed at runtime, so it can't be templated here).
+run-name: "Release for PR #${{ github.event.pull_request.number }}"
+
+on:
+  pull_request_target:
+    types: [closed]
+
+# Serialize on the base branch so runs queue and compute tags sequentially.
+# A per-PR group would let two labeled PRs merging together read the same
+# latest release and race to the same tag; the loser would silently skip.
+concurrency:
+  group: release-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  # Needed to dispatch the Docker workflow after the release is created.
+  actions: write
+  # Needed to list the merged PR's changed files for the docs/CI skip check.
+  pull-requests: read
+
+jobs:
+  create-release:
+    name: create release
+    # Every merge to main cuts a release: unlabeled merges default to a patch
+    # bump; the 'minor version' label opts into a minor bump instead. The
+    # bump/skip/dispatch logic lives in the shared release action.
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: seamus-sloan/gh-actions/release@v1
+        with:
+          docker-workflow: docker.yml

@@ -1,0 +1,31 @@
+# Bingus — multiplayer bingo for friends.
+#
+# Quick start:
+#   1. `docker compose up -d` (pulls sesloan/bingus from Docker Hub; add
+#      `--build` and swap `image:` for `build: .` to build locally instead).
+#   2. Open http://<host>:3000 and claim a name.
+#
+# Volume model:
+#   /data   durable state — the SQLite database (back this up)
+
+services:
+  bingus:
+    image: sesloan/bingus:latest
+    # For a local build instead of the published image:
+    # build: .
+    container_name: bingus
+    restart: unless-stopped
+
+    ports:
+      # host:container — change the host side if 3000 is taken.
+      - "3000:3000"
+
+    volumes:
+      # SQLite database. Created on first run.
+      - ./data:/data
+
+    environment:
+      # Run the server as this host user/group so the SQLite file in ./data
+      # lands owned by you. Set to your `id -u` / `id -g` (default 1000:1000).
+      PUID: "1000"
+      PGID: "1000"

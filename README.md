@@ -38,5 +38,20 @@ All run from the repo root:
 client/   Vite + React app
 server/   Hono + Socket.IO server
 shared/   Wire protocol (Zod schemas + Socket.IO event types)
+docker/   Container entrypoint (PUID/PGID privilege drop)
 docs/     Architecture and design docs
 ```
+
+## Deployment
+
+Bingus ships as a single Docker image — the server serves the built client
+same-origin, with SQLite on a `/data` volume:
+
+```bash
+docker compose up -d
+```
+
+pulls `sesloan/bingus:latest` (multi-arch: amd64 + arm64) and serves on
+`http://<host>:3000`. See [docker-compose.yml](docker-compose.yml) for the
+volume and PUID/PGID knobs, and [docs/architecture.md](docs/architecture.md)
+for the release pipeline that publishes the image.
