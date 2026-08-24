@@ -41,3 +41,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+
+  # Single required status check for the whole workflow: it always runs, so
+  # branch protection has one stable name to key on no matter how the real
+  # jobs above are added, renamed, or (later) path-gated.
+  ci:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, test, build]
+    steps:
+      - uses: seamus-sloan/gh-actions/ci-gate@ci-gate-v1
+        with:
+          needs: ${{ toJSON(needs) }}
