@@ -67,7 +67,7 @@ describe("GameRoom", () => {
     }
   });
 
-  it("gives players different terms, not just a different order", () => {
+  it("draws each seat's hand from the whole bank, not one fixed subset", () => {
     const b = deepBankBoard();
     const r = new GameRoom("BNGS-778", b, HOST.id);
     r.join(HOST);

@@ -309,7 +309,13 @@ export class GameManager {
  * Deal one card off the board's word bank: shuffle the bank, take the first
  * n*n - 1 terms. A bank sized exactly to the card is the degenerate case —
  * every seat gets the same terms in a different order — while a deeper bank
- * makes cards differ in content, so no two players are hunting the same list.
+ * lets cards differ in content too.
+ *
+ * Seats are dealt independently, so distinct cards are a matter of odds, not a
+ * guarantee: two seats draw the same set with probability 1 / C(bank, tiles),
+ * which is 1-in-9 for a 9-term 3x3 bank and vanishing for anything deeper.
+ * Forcing distinctness would couple the seats together and is impossible once
+ * the table outgrows the available sets, so the deal stays independent.
  */
 function deal(board: Board): string[] {
   return shuffled(board.terms).slice(0, termsRequired(board.size));

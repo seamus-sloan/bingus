@@ -160,10 +160,9 @@ export function BoardForm({
           />
           <p className={styles.hint}>
             Each card is dealt {required} terms off this bank, and the center
-            tile is a FREE space we throw in for nothing. Stock more than{' '}
-            {required} (up to {BOARD_TERMS_MAX}) and no two players get the
-            same board — stop at {required} and everyone shares one term list,
-            shuffled.
+            tile is a FREE space we throw in for nothing. Stop at {required} and
+            everyone plays one term list, shuffled; the deeper you stock it (up
+            to {BOARD_TERMS_MAX}), the less two cards tend to overlap.
           </p>
         </div>
         <div className={styles.errorSlot}>

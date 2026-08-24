@@ -2,7 +2,7 @@
 
 Multiplayer bingo with friends. And trash talk.
 
-Players log in with a name and password, pick a bingo board from the archive (or print a fresh one), and play live against friends — every player is dealt their own card off the board's word bank, marks their own tiles, and races to a row, column, diagonal, or blackout. Stock a board with more terms than a card holds and no two players get the same board. Game chat included for the banter.
+Players log in with a name and password, pick a bingo board from the archive (or print a fresh one), and play live against friends — every player is dealt their own card off the board's word bank, marks their own tiles, and races to a row, column, diagonal, or blackout. Stock a board with more terms than a card holds and players stop sharing one term list — the deeper the bank, the less two cards tend to overlap. Game chat included for the banter.
 
 There's no public sign-up: an admin creates each account, which mints a one-time code the new player uses as their first password — their first login walks them into choosing a real one. (Dev tip: run the server with `BINGUS_ADMIN=<name>` and the first boot prints that admin's one-time code.)
 

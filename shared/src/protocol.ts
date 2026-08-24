@@ -21,8 +21,9 @@ export type Player = z.infer<typeof PlayerSchema>;
 // A board is a named word bank. Each player's card is dealt from that bank
 // server-side: shuffle, then take the first n*n - 1 terms (the center tile is
 // a FREE space). A bank of exactly n*n - 1 gives everyone the same terms in a
-// different order; a bigger bank makes cards differ in content too, which is
-// the point of stocking one.
+// different order; a bigger bank lets cards differ in content too, which is the
+// point of stocking one. Deals are independent per seat, so a deeper bank makes
+// matching cards unlikely rather than impossible.
 //
 // GET  /api/boards?search=&limit=&offset= — browse the archive (newest first).
 // POST /api/boards — print a fresh board (requires a session).
