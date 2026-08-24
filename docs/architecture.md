@@ -84,7 +84,11 @@ Active game state lives in memory on the single server process (`server/src/game
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs three jobs on every push/PR: `lint`, `test`, and `build` — the same three root scripts, so CI and local always agree.
 
-A fourth job, `ci`, collapses those three into one pass/fail status via the shared [`seamus-sloan/gh-actions/ci-gate@ci-gate-v1`](https://github.com/seamus-sloan/gh-actions) action: it fails if any upstream job failed or was cancelled, and treats a skip as a pass. **`ci` is the single required status check on `main`** — key branch protection to it rather than to the three job names, so adding, renaming, or path-gating a job later doesn't leave a required check that never resolves.
+A fourth job, `ci`, collapses those three into one pass/fail status via the shared [`seamus-sloan/gh-actions/ci-gate@ci-gate-v1`](https://github.com/seamus-sloan/gh-actions) action: it fails if any upstream job failed or was cancelled, and treats a skip as a pass. **`ci` is the single required status check on `main`** — key branch protection to it rather than to the three job names, so adding, renaming, or path-gating a job later doesn't leave a required check that never resolves. The protection context is the bare job name, `ci`, not the workflow-qualified label GitHub's UI shows when it groups jobs under their workflow; confirm the exact string against a real run with:
+
+```
+gh api repos/seamus-sloan/bingus/commits/<sha>/check-runs --jq '.check_runs[].name'
+```
 
 ## Releases & deployment
 
