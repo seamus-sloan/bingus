@@ -13,7 +13,7 @@ function jsonResponse(status: number, body: unknown) {
 }
 
 const ADMIN_ME = {
-  player: { id: 'a1', name: 'Seamus' },
+  player: { id: 'a1', name: 'Admin' },
   needsPasswordReset: false,
   isAdmin: true,
 }
@@ -21,7 +21,7 @@ const ADMIN_ME = {
 const ROSTER = [
   {
     id: 'a1',
-    name: 'Seamus',
+    name: 'Admin',
     needsPasswordReset: false,
     isAdmin: true,
     createdAt: '2026-08-23 00:00:00',
