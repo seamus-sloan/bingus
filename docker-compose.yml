@@ -40,10 +40,14 @@ services:
       PUID: "1000"
       PGID: "1000"
 
-      # The admin account, bootstrapped on boot. First boot (or a database
-      # whose admin has no password yet) prints a one-time login code to the
-      # container logs; later boots are a no-op.
-      BINGUS_ADMIN: "Seamus"
+      # The admin account, bootstrapped on boot — change this to whatever you
+      # want your own admin called. First boot (or a database whose admin has
+      # no password yet) prints a one-time login code to the container logs;
+      # later boots are a no-op.
+      #
+      # Renaming this after first boot does NOT rename the existing admin — it
+      # bootstraps a second one. Pick the name before you first bring it up.
+      BINGUS_ADMIN: "admin"
 
       # Mark the session cookie Secure — enable ONLY once TLS terminates in
       # front of this container. Behind plain HTTP (LAN serving) it must stay
