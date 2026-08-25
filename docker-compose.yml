@@ -3,6 +3,8 @@
 # Quick start:
 #   1. `docker compose up -d` (pulls sesloan/bingus from Docker Hub; add
 #      `--build` and swap `image:` for `build: .` to build locally instead).
+#      `pull_policy: always` means this re-pulls every time, so the same
+#      command is also how you take a new release.
 #   2. `docker compose logs bingus` — the first boot prints a one-time login
 #      code for the BINGUS_ADMIN account.
 #   3. Open http://<host>:3000, log in as the admin with that code, set a
@@ -18,6 +20,11 @@ services:
     # build: .
     container_name: bingus
     restart: unless-stopped
+
+    # Re-check Docker Hub on every `up` so a new release actually lands.
+    # `restart: unless-stopped` alone replays the locally cached image — a
+    # moved `latest` tag never reaches a running container on its own.
+    pull_policy: always
 
     ports:
       # host:container — change the host side if 3000 is taken.
