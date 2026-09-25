@@ -3,8 +3,15 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, GamePlayer, GameState } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
-import { SessionProvider } from '../lib/session'
+import { SessionProvider, useSession } from '../lib/session'
+import { playBubble, unlockAudio } from '../lib/sounds'
 import { GamePlayPage } from './GamePlayPage'
+
+vi.mock('../lib/sounds', () => ({
+  playPop: vi.fn(),
+  playBubble: vi.fn(),
+  unlockAudio: vi.fn(),
+}))
 
 // Size-3 fixtures: cells 0..8, FREE at index 4, cards carry 8 terms.
 const MY_TERMS = [
@@ -75,25 +82,47 @@ function stubMe() {
   )
 }
 
-async function renderGame(room: GameRoomView) {
-  stubMe()
-  render(
+// Mirrors Screens() in App.tsx, which withholds every route while the
+// session is still loading — GamePlayPage never mounts without a player.
+function GameScreen({ room }: { room: GameRoomView }) {
+  const { player } = useSession()
+  if (!player) return null
+  return <GamePlayPage room={room} />
+}
+
+function gameTree(room: GameRoomView) {
+  return (
     <MemoryRouter initialEntries={['/game/BNGS-421']}>
       <SessionProvider>
         <Routes>
-          <Route path="/game/:code" element={<GamePlayPage room={room} />} />
+          <Route path="/game/:code" element={<GameScreen room={room} />} />
           <Route path="/boards" element={<h2>Archive probe</h2>} />
         </Routes>
       </SessionProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+}
+
+async function renderGame(room: GameRoomView) {
+  stubMe()
+  render(gameTree(room))
   // The page renders once the session resolves.
   return within(await screen.findByRole('group', { name: 'Your card' }))
+}
+
+// Like the server, every message is stamped a moment after the last one.
+const CHAT_EPOCH = Date.parse('2026-08-22T00:00:00.000Z')
+let chatSeq = 0
+
+function chatFrom(id: string, name: string, text: string): ChatMessage {
+  const at = new Date(CHAT_EPOCH + chatSeq++ * 1000).toISOString()
+  return { player: { id, name }, text, at }
 }
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
 })
 
 describe('gameplay screen', () => {
@@ -184,5 +213,73 @@ describe('gameplay screen', () => {
     const card = await renderGame(room)
     fireEvent.click(card.getAllByRole('button')[1])
     expect(room.mark).not.toHaveBeenCalled()
+  })
+})
+
+describe('chat sound', () => {
+  const backlog = [chatFrom('p2', 'Zoe', 'get rekt')]
+
+  // Renders a table with a join backlog, then returns a way to deliver the
+  // next chat array the way a socket broadcast would.
+  async function renderWithChat(chat: ChatMessage[]) {
+    stubMe()
+    const room = makeRoom(makeState(), chat)
+    const { rerender } = render(gameTree(room))
+    await screen.findByRole('group', { name: 'Your card' })
+    return (next: ChatMessage[]) => rerender(gameTree({ ...room, chat: next }))
+  }
+
+  it('wakes audio on mount and again on the first tap or keypress', async () => {
+    await renderGame(makeRoom(makeState()))
+    expect(unlockAudio).toHaveBeenCalledTimes(1)
+    fireEvent.pointerUp(window)
+    fireEvent.pointerUp(window)
+    expect(unlockAudio).toHaveBeenCalledTimes(2)
+    fireEvent.keyDown(window)
+    expect(unlockAudio).toHaveBeenCalledTimes(3)
+  })
+
+  it('bubbles when a rival speaks, but not for the join backlog', async () => {
+    const deliver = await renderWithChat(backlog)
+    expect(playBubble).not.toHaveBeenCalled()
+    deliver([...backlog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays quiet for my own messages', async () => {
+    const deliver = await renderWithChat(backlog)
+    deliver([...backlog, chatFrom('p1', 'Ruth', 'nice one')])
+    expect(playBubble).not.toHaveBeenCalled()
+  })
+
+  it('stays quiet with sound off', async () => {
+    const deliver = await renderWithChat(backlog)
+    fireEvent.click(screen.getByRole('button', { name: /sound on/i }))
+    deliver([...backlog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).not.toHaveBeenCalled()
+  })
+
+  it('a reconnect with a shorter backlog stays quiet, then bubbles for the next rival message', async () => {
+    const longBacklog = [
+      chatFrom('p2', 'Zoe', 'get rekt'),
+      chatFrom('p1', 'Ruth', 'never'),
+      chatFrom('p2', 'Zoe', 'watch this'),
+    ]
+    const deliver = await renderWithChat(longBacklog)
+    // The server caps its backlog at 100; a reconnect can hand back a
+    // shorter array than what we already rendered. That shouldn't bloop.
+    const rejoinBacklog = longBacklog.slice(1)
+    deliver(rejoinBacklog)
+    expect(playBubble).not.toHaveBeenCalled()
+    deliver([...rejoinBacklog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).toHaveBeenCalledTimes(1)
+  })
+
+  it('a reconnect at the backlog cap still bubbles for a rival message it missed', async () => {
+    const deliver = await renderWithChat(backlog)
+    // At the cap the rejoin backlog is rotated, not longer: the oldest
+    // message fell off and the missed one took its place.
+    deliver([...backlog.slice(1), chatFrom('p2', 'Zoe', 'missed')])
+    expect(playBubble).toHaveBeenCalledTimes(1)
   })
 })
