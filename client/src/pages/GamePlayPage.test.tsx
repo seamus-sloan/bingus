@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, GamePlayer, GameState } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
-import { SessionProvider } from '../lib/session'
+import { SessionProvider, useSession } from '../lib/session'
 import { playBubble } from '../lib/sounds'
 import { GamePlayPage } from './GamePlayPage'
 
@@ -78,12 +78,20 @@ function stubMe() {
   )
 }
 
+// Mirrors Screens() in App.tsx, which withholds every route while the
+// session is still loading — GamePlayPage never mounts without a player.
+function GameScreen({ room }: { room: GameRoomView }) {
+  const { player } = useSession()
+  if (!player) return null
+  return <GamePlayPage room={room} />
+}
+
 function gameTree(room: GameRoomView) {
   return (
     <MemoryRouter initialEntries={['/game/BNGS-421']}>
       <SessionProvider>
         <Routes>
-          <Route path="/game/:code" element={<GamePlayPage room={room} />} />
+          <Route path="/game/:code" element={<GameScreen room={room} />} />
           <Route path="/boards" element={<h2>Archive probe</h2>} />
         </Routes>
       </SessionProvider>
@@ -230,5 +238,21 @@ describe('chat sound', () => {
     fireEvent.click(screen.getByRole('button', { name: /sound on/i }))
     deliver([...backlog, chatFrom('p2', 'Zoe', 'bingo soon')])
     expect(playBubble).not.toHaveBeenCalled()
+  })
+
+  it('a reconnect with a shorter backlog stays quiet, then bubbles for the next rival message', async () => {
+    const longBacklog = [
+      chatFrom('p2', 'Zoe', 'get rekt'),
+      chatFrom('p1', 'Ruth', 'never'),
+      chatFrom('p2', 'Zoe', 'watch this'),
+    ]
+    const deliver = await renderWithChat(longBacklog)
+    // The server caps its backlog at 100; a reconnect can hand back a
+    // shorter array than what we already rendered. That shouldn't bloop.
+    const rejoinBacklog = longBacklog.slice(1)
+    deliver(rejoinBacklog)
+    expect(playBubble).not.toHaveBeenCalled()
+    deliver([...rejoinBacklog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).toHaveBeenCalledTimes(1)
   })
 })

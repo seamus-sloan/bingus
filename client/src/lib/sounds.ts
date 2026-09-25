@@ -38,6 +38,9 @@ let lastBubbleAt = -Infinity
  */
 export function playBubble() {
   withAudio((ctx) => {
+    // A missed bloop beats a late one: a suspended context would queue it
+    // until the next tap.
+    if (ctx.state !== 'running') return
     const now = ctx.currentTime
     if (now - lastBubbleAt < BUBBLE_GAP) return
     lastBubbleAt = now
