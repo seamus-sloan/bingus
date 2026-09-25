@@ -110,8 +110,13 @@ async function renderGame(room: GameRoomView) {
   return within(await screen.findByRole('group', { name: 'Your card' }))
 }
 
+// Like the server, every message is stamped a moment after the last one.
+const CHAT_EPOCH = Date.parse('2026-08-22T00:00:00.000Z')
+let chatSeq = 0
+
 function chatFrom(id: string, name: string, text: string): ChatMessage {
-  return { player: { id, name }, text, at: '2026-08-22T00:00:00.000Z' }
+  const at = new Date(CHAT_EPOCH + chatSeq++ * 1000).toISOString()
+  return { player: { id, name }, text, at }
 }
 
 afterEach(() => {
@@ -267,6 +272,14 @@ describe('chat sound', () => {
     deliver(rejoinBacklog)
     expect(playBubble).not.toHaveBeenCalled()
     deliver([...rejoinBacklog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).toHaveBeenCalledTimes(1)
+  })
+
+  it('a reconnect at the backlog cap still bubbles for a rival message it missed', async () => {
+    const deliver = await renderWithChat(backlog)
+    // At the cap the rejoin backlog is rotated, not longer: the oldest
+    // message fell off and the missed one took its place.
+    deliver([...backlog.slice(1), chatFrom('p2', 'Zoe', 'missed')])
     expect(playBubble).toHaveBeenCalledTimes(1)
   })
 })

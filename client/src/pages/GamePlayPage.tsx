@@ -154,13 +154,15 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
     }
   }, [])
 
-  // Bloop when someone else speaks. Starts from the join backlog so arriving
-  // at a chatty table stays quiet; a reconnect that shrinks the list just
-  // resets the mark.
-  const heardChat = useRef(room.chat.length)
+  // Bloop when someone else speaks. Tracks the server timestamp of the
+  // newest message heard, starting from the join backlog so arriving at a
+  // chatty table stays quiet. A reconnect's backlog — shorter, or rotated at
+  // the server's cap — only bloops for what was missed.
+  const heardUpTo = useRef(room.chat[room.chat.length - 1]?.at ?? '')
   useEffect(() => {
-    const fresh = room.chat.slice(heardChat.current)
-    heardChat.current = room.chat.length
+    const fresh = room.chat.filter((m) => m.at > heardUpTo.current)
+    if (fresh.length === 0) return
+    heardUpTo.current = fresh[fresh.length - 1].at
     if (soundOn && player && fresh.some((m) => m.player.id !== player.id)) {
       playBubble()
     }
