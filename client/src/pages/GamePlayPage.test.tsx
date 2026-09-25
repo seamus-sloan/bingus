@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, GamePlayer, GameState } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
 import { SessionProvider } from '../lib/session'
+import { playBubble } from '../lib/sounds'
 import { GamePlayPage } from './GamePlayPage'
+
+vi.mock('../lib/sounds', () => ({ playPop: vi.fn(), playBubble: vi.fn() }))
 
 // Size-3 fixtures: cells 0..8, FREE at index 4, cards carry 8 terms.
 const MY_TERMS = [
@@ -75,9 +78,8 @@ function stubMe() {
   )
 }
 
-async function renderGame(room: GameRoomView) {
-  stubMe()
-  render(
+function gameTree(room: GameRoomView) {
+  return (
     <MemoryRouter initialEntries={['/game/BNGS-421']}>
       <SessionProvider>
         <Routes>
@@ -85,15 +87,25 @@ async function renderGame(room: GameRoomView) {
           <Route path="/boards" element={<h2>Archive probe</h2>} />
         </Routes>
       </SessionProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
+}
+
+async function renderGame(room: GameRoomView) {
+  stubMe()
+  render(gameTree(room))
   // The page renders once the session resolves.
   return within(await screen.findByRole('group', { name: 'Your card' }))
+}
+
+function chatFrom(id: string, name: string, text: string): ChatMessage {
+  return { player: { id, name }, text, at: '2026-08-22T00:00:00.000Z' }
 }
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
 })
 
 describe('gameplay screen', () => {
@@ -184,5 +196,39 @@ describe('gameplay screen', () => {
     const card = await renderGame(room)
     fireEvent.click(card.getAllByRole('button')[1])
     expect(room.mark).not.toHaveBeenCalled()
+  })
+})
+
+describe('chat sound', () => {
+  const backlog = [chatFrom('p2', 'Zoe', 'get rekt')]
+
+  // Renders a table with a join backlog, then returns a way to deliver the
+  // next chat array the way a socket broadcast would.
+  async function renderWithChat(chat: ChatMessage[]) {
+    stubMe()
+    const room = makeRoom(makeState(), chat)
+    const { rerender } = render(gameTree(room))
+    await screen.findByRole('group', { name: 'Your card' })
+    return (next: ChatMessage[]) => rerender(gameTree({ ...room, chat: next }))
+  }
+
+  it('bubbles when a rival speaks, but not for the join backlog', async () => {
+    const deliver = await renderWithChat(backlog)
+    expect(playBubble).not.toHaveBeenCalled()
+    deliver([...backlog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays quiet for my own messages', async () => {
+    const deliver = await renderWithChat(backlog)
+    deliver([...backlog, chatFrom('p1', 'Ruth', 'nice one')])
+    expect(playBubble).not.toHaveBeenCalled()
+  })
+
+  it('stays quiet with sound off', async () => {
+    const deliver = await renderWithChat(backlog)
+    fireEvent.click(screen.getByRole('button', { name: /sound on/i }))
+    deliver([...backlog, chatFrom('p2', 'Zoe', 'bingo soon')])
+    expect(playBubble).not.toHaveBeenCalled()
   })
 })

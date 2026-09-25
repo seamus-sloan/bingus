@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { freeIndex, type BoardSize, type GamePlayer } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
 import { useSession } from '../lib/session'
+import { playBubble, playPop } from '../lib/sounds'
 import styles from './GamePlayPage.module.css'
 
 // Mockup 1g — the live table. My card in the main column, rivals' mini
@@ -21,26 +22,6 @@ function hashId(id: string): number {
 
 function accentFor(id: string): string {
   return CANDY[hashId(id) % CANDY.length]
-}
-
-// A tiny celebratory pop on marking a tile. Pure garnish: any environment
-// without WebAudio (tests, muted autoplay policies) just stays silent.
-let audioCtx: AudioContext | null = null
-function playPop() {
-  try {
-    audioCtx ??= new AudioContext()
-    const osc = audioCtx.createOscillator()
-    const gain = audioCtx.createGain()
-    osc.frequency.value = 640
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12)
-    osc.connect(gain)
-    gain.connect(audioCtx.destination)
-    osc.start()
-    osc.stop(audioCtx.currentTime + 0.13)
-  } catch {
-    // no audio, no problem
-  }
 }
 
 // Cells run 0..size²-1 with the FREE tile at freeIndex(size); the card array
@@ -157,6 +138,18 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
     const el = chatListRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [chatCount])
+
+  // Bloop when someone else speaks. Starts from the join backlog so arriving
+  // at a chatty table stays quiet; a reconnect that shrinks the list just
+  // resets the mark.
+  const heardChat = useRef(room.chat.length)
+  useEffect(() => {
+    const fresh = room.chat.slice(heardChat.current)
+    heardChat.current = room.chat.length
+    if (soundOn && player && fresh.some((m) => m.player.id !== player.id)) {
+      playBubble()
+    }
+  }, [room.chat, soundOn, player])
 
   if (!player) return null
   const { state } = room
