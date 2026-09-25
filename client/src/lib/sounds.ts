@@ -37,10 +37,10 @@ let lastBubbleAt = -Infinity
  * never reads as the flat tile pop.
  */
 export function playBubble() {
+  // Before the player's first tap the browser won't start audio, and a
+  // bubble queued then would play late, on top of that tap. Skip it.
+  if (navigator.userActivation?.hasBeenActive === false) return
   withAudio((ctx) => {
-    // A missed bloop beats a late one: a suspended context would queue it
-    // until the next tap.
-    if (ctx.state !== 'running') return
     const now = ctx.currentTime
     if (now - lastBubbleAt < BUBBLE_GAP) return
     lastBubbleAt = now
