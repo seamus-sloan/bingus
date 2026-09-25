@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { freeIndex, type BoardSize, type GamePlayer } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
 import { useSession } from '../lib/session'
-import { playBubble, playPop } from '../lib/sounds'
+import { playBubble, playPop, unlockAudio } from '../lib/sounds'
 import styles from './GamePlayPage.module.css'
 
 // Mockup 1g — the live table. My card in the main column, rivals' mini
@@ -138,6 +138,21 @@ export function GamePlayPage({ room }: { room: GameRoomView }) {
     const el = chatListRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [chatCount])
+
+  // Rival bubbles arrive outside any gesture, so wake audio up front: on
+  // mount (Chrome and Firefox start once the player has clicked into the
+  // page) and on the first tap or keypress (Safari and iOS only start audio
+  // mid-gesture). pointerup, not click — iOS won't reliably fire click on a
+  // plain element, and a touch pointerdown doesn't count as a gesture.
+  useEffect(() => {
+    unlockAudio()
+    window.addEventListener('pointerup', unlockAudio, { once: true })
+    window.addEventListener('keydown', unlockAudio, { once: true })
+    return () => {
+      window.removeEventListener('pointerup', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+    }
+  }, [])
 
   // Bloop when someone else speaks. Starts from the join backlog so arriving
   // at a chatty table stays quiet; a reconnect that shrinks the list just

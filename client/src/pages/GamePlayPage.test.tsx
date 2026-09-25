@@ -4,10 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, GamePlayer, GameState } from '@bingus/shared'
 import type { GameRoomView } from '../lib/gameRoom'
 import { SessionProvider, useSession } from '../lib/session'
-import { playBubble } from '../lib/sounds'
+import { playBubble, unlockAudio } from '../lib/sounds'
 import { GamePlayPage } from './GamePlayPage'
 
-vi.mock('../lib/sounds', () => ({ playPop: vi.fn(), playBubble: vi.fn() }))
+vi.mock('../lib/sounds', () => ({
+  playPop: vi.fn(),
+  playBubble: vi.fn(),
+  unlockAudio: vi.fn(),
+}))
 
 // Size-3 fixtures: cells 0..8, FREE at index 4, cards carry 8 terms.
 const MY_TERMS = [
@@ -219,6 +223,16 @@ describe('chat sound', () => {
     await screen.findByRole('group', { name: 'Your card' })
     return (next: ChatMessage[]) => rerender(gameTree({ ...room, chat: next }))
   }
+
+  it('wakes audio on mount and again on the first tap or keypress', async () => {
+    await renderGame(makeRoom(makeState()))
+    expect(unlockAudio).toHaveBeenCalledTimes(1)
+    fireEvent.pointerUp(window)
+    fireEvent.pointerUp(window)
+    expect(unlockAudio).toHaveBeenCalledTimes(2)
+    fireEvent.keyDown(window)
+    expect(unlockAudio).toHaveBeenCalledTimes(3)
+  })
 
   it('bubbles when a rival speaks, but not for the join backlog', async () => {
     const deliver = await renderWithChat(backlog)

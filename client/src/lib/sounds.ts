@@ -13,6 +13,14 @@ function withAudio(play: (ctx: AudioContext) => void) {
   }
 }
 
+/**
+ * Wake the shared audio context. Call it from a user gesture: Safari and iOS
+ * only start audio while one is in progress.
+ */
+export function unlockAudio() {
+  withAudio(() => {})
+}
+
 /** A celebratory pop on marking a tile. */
 export function playPop() {
   withAudio((ctx) => {
@@ -37,9 +45,10 @@ let lastBubbleAt = -Infinity
  * never reads as the flat tile pop.
  */
 export function playBubble() {
-  // Before the player's first tap the browser won't start audio, and a
-  // bubble queued then would play late, on top of that tap. Skip it.
-  if (navigator.userActivation?.hasBeenActive === false) return
+  // Chat lands on a socket event, not a gesture, so it can't start audio.
+  // A bubble scheduled on a suspended context would queue and play late, on
+  // the next tap — so it waits for unlockAudio() to get the clock running.
+  if (audioCtx?.state !== 'running') return
   withAudio((ctx) => {
     const now = ctx.currentTime
     if (now - lastBubbleAt < BUBBLE_GAP) return
